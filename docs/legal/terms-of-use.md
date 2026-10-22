@@ -2,7 +2,7 @@
 
 > **DRAFT FOR COUNSEL.** Not legal advice. A qualified lawyer must review it before publication, including consumer-protection, auto-renewal (e.g. California ARL, FTC negative-option rules) and health-claims requirements. On iOS, the Apple Standard EULA can be used instead of, or alongside, these terms. Replace bracketed items.
 
-**Effective date:** [date] · **Provider:** [legal entity name]
+**Effective date:** the date these terms are published with the app · **Provider:** Jiae Kim, a sole proprietor, operating Ondessa
 
 ## 1. What Ondessa is, and isn't
 
@@ -22,7 +22,7 @@ Ondessa is a wellness and education app for tracking menstrual cycles, fertility
 - Payment is charged to your App Store or Google Play account when you confirm the purchase.
 - Your subscription renews automatically at the same price for the same period unless you cancel at least 24 hours before the end of the current period.
 - Manage or cancel in your App Store or Google Play account settings. When you cancel, access continues until the end of the period you paid for.
-- Refunds are handled by Apple or Google under their policies [and, for any web purchases, as described at [URL]].
+- Refunds are handled by Apple or Google under their policies.
 - Deleting your data or the app does not cancel a subscription.
 
 ## 3. Your data
@@ -35,16 +35,16 @@ Don't reverse engineer, resell or misuse the app, or use it unlawfully.
 
 ## 5. Content
 
-Educational content is general information reviewed by qualified clinicians, not personal medical advice. Sources are listed with each article.
+Educational content is general information drawn from the listed sources. It has not been reviewed by a medical professional and is not personal medical advice. Sources are listed with each article.
 
 ## 6. Disclaimers and limitation of liability
 
-[Counsel to draft, consistent with applicable consumer law. It must not limit liability where the law does not allow it.]
+Ondessa is provided "as is". Predictions, insights and articles are estimates and general information, and may be wrong or incomplete. To the extent the law allows, we are not liable for decisions you make based on the app, or for indirect or consequential losses, and our total liability for any claim is limited to the amount you paid for Ondessa in the 12 months before the claim. Nothing in these terms limits liability that cannot be limited by law, or your rights as a consumer.
 
 ## 7. Changes and termination
 
-[Counsel to draft.]
+We may update these terms; we will post changes here and show material changes in the app before they take effect. You can stop using Ondessa at any time by cancelling your subscription and deleting the app. We may end access if you seriously breach these terms. These terms are governed by the laws of California, USA, without limiting any rights you have under the laws where you live.
 
 ## 8. Contact
 
-[legal entity], [support email].
+Jiae Kim, operator of Ondessa: innerlink24@gmail.com.

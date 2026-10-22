@@ -15,18 +15,18 @@ Built from three independent audits on 2026-10-22: an App Store submission speci
 | Privacy manifest, Face ID text, icons, splash | ✅ |
 | Android target API 36, cloud backup off, no exact alarms | ✅ |
 | No preview pass in store builds | ✅ Enforced |
-| Data-loss and security fixes from code review | ✅ 85 unit tests + 125 end-to-end tests (all 13 QA bugs and 3 accessibility issues fixed and guarded) |
-| Clinical review of content and prediction thresholds | ❌ Blocker: needs a licensed clinician |
-| Final Privacy Policy and Terms | ❌ Blocker: drafts in `docs/legal/` need a lawyer |
-| Company details, support email, public URLs | ❌ Blocker: fill `src/content/company.ts` |
-| Trademark clearance for "Ondessa" | ❌ Needs counsel |
+| Data-loss and security fixes from code review | ✅ 85 unit tests + 139 end-to-end tests (all 13 QA bugs and 3 accessibility issues fixed and guarded) |
+| Health content framed as general information with sources | ✅ Enforced by release:check |
+| Final Privacy Policy and Terms | ✅ Finalized in-app and in `docs/legal/` (operator: Jiae Kim) |
+| Company details, support email, public URLs | ✅ Filled; URLs use the free Vercel address until a custom domain is bought |
+| Trademark clearance for "Ondessa" | ⚠ Search tmsearch.uspto.gov before launch |
 
 ## What only you can do, in order
 
 1. **Form the publishing entity** (LLC or similar) and get a D-U-N-S number. Apple guideline 5.1.1(ix) expects health apps to come from an organisation. New personal Google Play accounts also need a 12-tester, 14-day closed test.
 2. **Enrol** in the Apple Developer Program (organisation, $99/yr) and open a Google Play Console organisation account ($25 once).
 3. **Clear the name.** Get a trademark search from counsel. If you change the name, update `appId` in `capacitor.config.ts` and the display name.
-4. **Clinical review.** Have a licensed OB-GYN or certified nurse-midwife review every article in `src/content/library.ts`, the pregnancy week notes, and the thresholds in `src/engine/rules.ts`. Record name, credentials and date in each `review` field, and set a final `RULES.version`. Remove any article they won't sign off.
+4. **Content.** Articles and predictions are presented as general information with sources, not as medically reviewed. Don't add review claims to the app, the store listing or the review notes unless a qualified professional has actually reviewed the content.
 5. **Legal.** Have a lawyer finalise `docs/legal/privacy-policy.md` and `terms-of-use.md`, then update the in-app Privacy and Terms screens and remove the draft labels.
 6. **Fill in `src/content/company.ts`** and publish the web build so the Privacy, Terms and Help URLs are live.
 7. **Create the subscriptions:**
@@ -75,7 +75,7 @@ npx cap open android          # Android Studio
 
 ## Reviewer notes (paste into App Store Connect)
 
-> Ondessa has no account or login; health data is stored only on the device. To test: tap "I understand, continue" and choose "Understand my cycle". Enter any recent date as the last period start and finish setup. The subscription screen appears; buy either plan with a Sandbox Apple ID. "Restore purchases" is on the same screen and under You → Membership. Reminders are under You → Reminders & settings, and Face ID unlock is under You → Privacy center once a passcode is set. The app does not use HealthKit. It is not a medical device and not a contraceptive; predictions are labelled as estimates with confidence levels, and each article lists its sources and clinical reviewer.
+> Ondessa has no account or login; health data is stored only on the device. To test: tap "I understand, continue" and choose "Understand my cycle". Enter any recent date as the last period start and finish setup. The subscription screen appears; buy either plan with a Sandbox Apple ID. "Restore purchases" is on the same screen and under You → Membership. Reminders are under You → Reminders & settings, and Face ID unlock is under You → Privacy center once a passcode is set. The app does not use HealthKit. It is not a medical device and not a contraceptive; predictions are labelled as estimates with confidence levels, and each article lists its sources. Content is general information, not medical advice.
 
 ## App Privacy (Apple) and Data safety (Google)
 

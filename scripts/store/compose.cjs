@@ -19,7 +19,7 @@ const FONTS = `
 // Each slide: what it shows, its headline, and the phase colour it wears.
 const SLIDES = [
   { id: '01-today', img: 'today', eyebrow: 'Cycle predictions', title: 'Know your rhythm. <em>Keep it yours.</em>', bg: '#dff1e7', glow: '#9fd6b8', ink: '#1a1020' },
-  { id: '02-patterns', img: 'patterns', eyebrow: 'My Cycle, My Patterns', title: 'Patterns from <em>your</em> logs. Never guesses.', bg: '#ece8fa', glow: '#c4b8f0', ink: '#1a1020' },
+  { id: '02-patterns', img: 'patterns', eyebrow: 'Insights', title: 'Patterns from <em>your</em> logs. Never guesses.', bg: '#ece8fa', glow: '#c4b8f0', ink: '#1a1020' },
   { id: '03-calendar', img: 'calendar', eyebrow: 'Honest predictions', title: 'Every estimate shows <em>how sure it is.</em>', bg: '#fbe4ea', glow: '#f1a9bd', ink: '#1a1020' },
   { id: '04-fertility', img: 'fertility', eyebrow: 'Trying to conceive', title: 'Your best days, <em>and the honest range.</em>', bg: '#dcf1e6', glow: '#8fd1b0', ink: '#1a1020' },
   { id: '05-log', img: 'log', eyebrow: 'Daily log', title: 'Log in seconds. <em>Skip anything.</em>', bg: '#fcebdc', glow: '#f3c194', ink: '#1a1020' },

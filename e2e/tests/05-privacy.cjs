@@ -208,9 +208,10 @@ module.exports = [
       await L.seed(page, richData(), { route: '/app/privacy' });
       await page.evaluate(() => sessionStorage.setItem('x', '1'));
       const btn = page.getByRole('button', { name: 'Permanently delete' });
-      await page.getByLabel('Type DELETE to confirm').fill('delete');
+      await page.getByLabel('Type DELETE to confirm').fill('delet');
       assert.equal(await btn.isDisabled(), true);
-      await page.getByLabel('Type DELETE to confirm').fill('DELETE');
+      await page.getByLabel('Type DELETE to confirm').fill(' delete ');
+      assert.equal(await btn.isDisabled(), false, 'any case is accepted');
       await btn.click();
       await page.waitForURL(/#\/deleted$/, { timeout: 10000 });
       assert.equal(await page.locator('h1').first().textContent(), 'Everything is deleted.');

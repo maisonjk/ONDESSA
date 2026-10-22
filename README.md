@@ -2,7 +2,7 @@
 
 A private, paid cycle, fertility and pregnancy companion. Local-first: health data lives on the user's device, predictions are deterministic and explained, and nothing about anyone's body is sent to a server.
 
-> **Ondessa** is a working name pending trademark clearance. It replaces the original "Luma Cycle" placeholder.
+> Operated by Jiae Kim (sole proprietor). Run a trademark search on the name before launch.
 
 ## Run it
 
@@ -10,7 +10,7 @@ A private, paid cycle, fertility and pregnancy companion. Local-first: health da
 npm install
 npm run dev            # http://localhost:5173 (preview pass available in dev)
 npm test               # 85 unit tests
-npm run test:e2e       # 125 end-to-end tests: every screen, time zones, accessibility (axe), privacy
+npm run test:e2e       # 139 end-to-end tests: every screen, time zones, accessibility (axe), privacy
 npm run test:tz        # same suite in 4 time zones (DST and half-hour DST)
 npm run build          # production build with strict CSP in dist/
 npm run licenses       # OSS license inventory
@@ -47,4 +47,4 @@ public/        PWA manifest, icon, service worker, security headers
 
 ## Not medical advice
 
-Ondessa is a wellness and education product, not a medical device, and not contraception. Educational content is draft and awaiting clinical review.
+Ondessa is a wellness and education product, not a medical device, and not contraception. Educational content is general information with sources, not medical advice.

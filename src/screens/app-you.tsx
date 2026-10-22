@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, navigate } from '../app/router';
 import { useStore } from '../app/store';
 import { exportFile, shareText } from '../platform/files';
@@ -10,12 +10,35 @@ import { EvidenceStrip, Icon, MedicalNote, PageTitle, Toast, ToggleRow, useToast
 
 /* ------------------------------------------------------------------ You */
 
+/** Which new features this device has opened, so "New" badges disappear once seen. UI only. */
+const VISITED_KEY = 'ondessa.visited';
+function visited(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(VISITED_KEY) ?? '[]') as unknown;
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+function useMarkVisited(id: string, skip: boolean) {
+  useEffect(() => {
+    if (skip) return;
+    try {
+      const v = visited();
+      if (!v.includes(id)) localStorage.setItem(VISITED_KEY, JSON.stringify([...v, id]));
+    } catch {
+      /* storage unavailable */
+    }
+  }, [id, skip]);
+}
+
 const PHASE_BAR = ['var(--berry)', 'var(--apricot)', 'var(--sage)', 'var(--lavender)'];
 
 export function You() {
   const { data, entitlement, locked, tour } = useStore();
   if (!data) return null;
   const days = Object.keys(data.logs).length;
+  const seen = tour ? ['share', 'recap'] : visited();
   const active = entitlement.status === 'active';
   const member = !active
     ? { eyebrow: 'Membership', title: 'No active membership', detail: 'See plans and restore options.' }
@@ -31,8 +54,8 @@ export function You() {
     {
       title: 'Share and look back',
       items: [
-        { to: '/app/share', icon: 'people', t: 'Partner sharing', d: 'Send a heads-up you choose. Nothing is shared automatically.', isNew: true },
-        { to: '/app/recap', icon: 'chart', t: 'Cycle recap', d: 'Your last cycle, and how close the prediction was.', isNew: true },
+        { to: '/app/share', icon: 'people', t: 'Partner sharing', d: 'Send a heads-up you choose. Nothing is shared automatically.', isNew: !seen.includes('share') },
+        { to: '/app/recap', icon: 'chart', t: 'Cycle recap', d: 'Your last cycle, and how close the prediction was.', isNew: !seen.includes('recap') && days > 0 },
         { to: '/app/history', icon: 'history', t: 'Add past periods', d: 'Earlier dates make predictions sharper sooner.' },
       ],
     },
@@ -81,8 +104,8 @@ export function You() {
           <div className="card" style={{ paddingTop: 4, paddingBottom: 4 }}>
             {g.items.map((i) => (
               <Link key={i.to} to={i.to} className="list-btn">
-                <span className="row"><span style={{ color: 'var(--berry)' }}><Icon name={i.icon} /></span><span><span style={{ fontWeight: 600, display: 'block' }}>{i.t}</span><span className="small muted">{i.d}</span></span></span>
-                <span className="row" style={{ '--gap': '8px' } as React.CSSProperties}>{i.isNew && <span className="tag">NEW</span>}<Icon name="chevron" /></span>
+                <span className="row" style={{ flex: '1 1 auto', minWidth: 0, alignItems: 'flex-start' }}><span style={{ color: 'var(--berry)', flex: 'none', marginTop: 2 }}><Icon name={i.icon} /></span><span style={{ minWidth: 0 }}><span style={{ fontWeight: 600, display: 'block' }}>{i.t}</span><span className="small muted">{i.d}</span></span></span>
+                <span className="row" style={{ '--gap': '8px', flex: 'none' } as React.CSSProperties}>{i.isNew && <span className="tag">NEW</span>}<Icon name="chevron" /></span>
               </Link>
             ))}
           </div>
@@ -96,6 +119,7 @@ export function You() {
 
 export function PartnerShare() {
   const { data, forecast: f, today, tour } = useStore();
+  useMarkVisited('share', tour);
   const [opts, setOpts] = useState<PartnerShareOptions>({ countdown: true, phase: true, fertile: false });
   const [toast, showToast] = useToast();
   if (!data || !f) return null;
@@ -162,7 +186,8 @@ export function PartnerShare() {
 /* ------------------------------------------------------------------ Cycle recap */
 
 export function Recap() {
-  const { data, today } = useStore();
+  const { data, today, tour } = useStore();
+  useMarkVisited('recap', tour);
   const [withSymptoms, setWithSymptoms] = useState(false);
   const [toast, showToast] = useToast();
   if (!data) return null;

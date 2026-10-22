@@ -48,6 +48,7 @@ The axe tests use the `axe-core` dev dependency (or `AXE_PATH`). `npm run test:e
 | 09-a11y | axe WCAG 2.1 AA on every screen, contrast, touch targets, switches, keyboard-only |
 | 10-hygiene | full crawl for console errors and external requests, CSP, no dates in URLs |
 | 11-v2 | heads-up, log tiles, smart symptom order, saved bar, evidence strips, recap, past periods, partner sharing and calendar file, You tab, appearance; strict axe + 44px targets on the new screens |
+| 12-presubmit | pre-submission QA fixes: pregnancy Today/Calendar/Log, end-pregnancy panel, paywall order and pregnancy card, heads-up chip, late-period link, note limit, setup draft survives reload, tour copy, New badges, support email; strict axe + 44px targets |
 
 ## Bug history
 

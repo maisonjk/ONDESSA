@@ -64,7 +64,7 @@ module.exports = [
       await startTour(page);
       await page.goBack();
       await page.waitForURL(/#\/$/);
-      await L.onboard(page, { lastStart: L.addDays(T, -4) });
+      await L.onboard(page, { lastStart: L.addDays(T, -10) });
       await page.getByRole('button', { name: /preview pass/ }).click();
       await page.waitForURL(/#\/app$/);
       assert.equal(await page.locator('.tour-banner').count(), 0, 'tour banner shown over real data');

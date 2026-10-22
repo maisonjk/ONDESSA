@@ -54,12 +54,18 @@ function Routes() {
     if (!tour) {
       if (!data) return <Redirect to="/start" />;
       if (entitlement.status === 'loading') return <div className="lock-screen" aria-busy="true" />;
-      if (entitlement.status !== 'active') return <Redirect to="/plans" />;
+      // Without a membership, people can still back up, export or delete their own data.
+      if (entitlement.status !== 'active') {
+        if (!OPEN_WITHOUT_MEMBERSHIP.includes(path)) return <Redirect to="/plans" />;
+        return <AppShell path={path} limited>{appScreen(path)}</AppShell>;
+      }
     }
     return <AppShell path={path}>{appScreen(path)}</AppShell>;
   }
   return <Redirect to="/" />;
 }
+
+const OPEN_WITHOUT_MEMBERSHIP = ['/app/privacy', '/app/membership'];
 
 function appScreen(path: string) {
   if (path.startsWith('/app/library/')) return <ArticleView slug={path.slice(13)} base="/app/library" />;

@@ -113,7 +113,7 @@ export function findPatterns(f: Forecast, logs: Record<ISODate, DayLog>): Insigh
         const near = lens.filter((l) => Math.abs(l - f.predictedCycleLength) <= RULES.windowHalfWidth.developing).length;
         return { hits: near, total: lens.length, label: `${near} of ${lens.length} within ${RULES.windowHalfWidth.developing} days of your usual length` };
       })(),
-      limitation: 'Some variation is normal. Variation of more than 7–9 days can be worth mentioning to a clinician.',
+      limitation: 'Some variation is normal. Variation of more than 7–9 days can be worth mentioning to a doctor.',
     });
   }
 

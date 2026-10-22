@@ -126,7 +126,9 @@ module.exports = [
       const last = L.addDays(T, -10);
       await L.onboard(page, { goal: 'understand', lastStart: last, earlier: [L.addDays(last, -31), L.addDays(last, -62)] });
       const v = (await L.readVault(page)).data;
-      assert.deepEqual(Object.keys(v.logs).sort(), [L.addDays(last, -62), L.addDays(last, -31), last]);
+      // each start gets the usual 5 period days
+      const expected = [L.addDays(last, -62), L.addDays(last, -31), last].flatMap((s) => [0, 1, 2, 3, 4].map((i) => L.addDays(s, i))).sort();
+      assert.deepEqual(Object.keys(v.logs).sort(), expected);
       const card = await page.locator('[aria-label="Your prediction"]').innerText();
       // two 31-day cycles blended with the entered 28 days: (31 + 31 + 28) / 3 = 30
       assert.ok(card.includes(L.formatShort(L.addDays(last, 30))), `expected a 30-day cycle in ${card}`);
