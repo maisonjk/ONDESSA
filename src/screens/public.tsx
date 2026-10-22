@@ -33,7 +33,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
             <>
               <Link to="/" className="wordmark"><Mark /> Ondessa</Link>
               <nav className="row" style={{ '--gap': '4px' } as React.CSSProperties}>
-                <Link to="/library" className="btn ghost">Library</Link>
+                <Link to="/library" className="btn ghost hide-narrow">Library</Link>
                 <Link to="/plans" className="btn ghost">Pricing</Link>
                 {inApp ? <Link to="/app" className="btn">Open</Link> : !setUp && <Link to="/start" className="btn">Start</Link>}
               </nav>
@@ -145,7 +145,8 @@ export function Landing() {
 
 export function Plans() {
   const { data, entitlement, refreshEntitlement, usePreviewPass, forecast: f, tour, startTour } = useStore();
-  const mine = data && !tour ? f : undefined;
+  const pregnant = !!(data && !tour && data.pregnancy);
+  const mine = data && !tour && !pregnant ? f : undefined;
   const hasPrediction = !!mine?.nextPeriod;
   const [plan, setPlan] = useState<'annual' | 'monthly'>('annual');
   const [key, setKey] = useState('');
@@ -171,7 +172,7 @@ export function Plans() {
         <div className="stack center" style={{ '--gap': '10px', alignItems: 'center' } as React.CSSProperties}>
           <span className="eyebrow">Ondessa membership</span>
           <h1 style={{ fontSize: 'clamp(2rem, 5vw, 2.8rem)' }}>
-            {hasPrediction ? 'Your first prediction is ready.' : mine ? 'You’re set up.' : 'Choose your plan'}
+            {pregnant ? 'Your pregnancy calendar is ready.' : hasPrediction ? 'Your first prediction is ready.' : mine ? 'You’re set up.' : 'Choose your plan'}
           </h1>
           <p className="muted" style={{ maxWidth: '50ch' }}>
             {mine && !hasPrediction
@@ -315,7 +316,7 @@ export function LibraryIndex() {
   );
 }
 
-export function LibraryList() {
+export function LibraryList({ base = '/library' }: { base?: string }) {
   return (
     <div className="stack" style={{ '--gap': '28px' } as React.CSSProperties}>
       <header className="stack" style={{ '--gap': '8px' } as React.CSSProperties}>
@@ -332,7 +333,7 @@ export function LibraryList() {
             <p className="small faint">{c.blurb}</p>
             <div className="card" style={{ paddingTop: 4, paddingBottom: 4 }}>
               {items.map((a) => (
-                <Link key={a.slug} to={`/library/${a.slug}`} className="list-btn">
+                <Link key={a.slug} to={`${base}/${a.slug}`} className="list-btn">
                   <span className="stack" style={{ '--gap': '2px' } as React.CSSProperties}>
                     <span style={{ fontWeight: 600 }}>{a.title}</span>
                     <span className="small muted">{a.summary}</span>
@@ -356,12 +357,12 @@ export function ReviewBadge({ a }: { a: Article }) {
   );
 }
 
-export function ArticleView({ slug }: { slug: string }) {
+export function ArticleView({ slug, base = '/library' }: { slug: string; base?: string }) {
   const a = ARTICLES.find((x) => x.slug === slug);
   if (!a) return <p>Article not found.</p>;
   return (
     <article className="prose stack" style={{ '--gap': '14px' } as React.CSSProperties}>
-      <Link to="/library" className="btn ghost" ><Icon name="back" size={18} /> Library</Link>
+      <Link to={base} className="btn ghost" ><Icon name="back" size={18} /> Library</Link>
       <span className="eyebrow">{CATEGORIES.find((c) => c.id === a.category)?.title} · {a.minutes} min read</span>
       <h1 style={{ fontSize: 'clamp(1.9rem, 5vw, 2.6rem)' }}>{a.title}</h1>
       <div><ReviewBadge a={a} /></div>

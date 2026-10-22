@@ -10,7 +10,7 @@ import { PREGNANCY_WEEKS_REVIEW, weekNotes } from '../content/library';
 import { BackupNeedsPassword, makeBackup, readBackup } from '../data/backup';
 import { WrongPassphraseError } from '../data/crypto';
 import {
-  CONFIDENCE_COPY, RULES, addDays, upcomingFertileWindow, detectThermalShift, dueDateFromLmp, formatLong, formatRange, formatShort,
+  CONFIDENCE_COPY, RULES, addDays, localToday, upcomingFertileWindow, detectThermalShift, dueDateFromLmp, formatLong, formatRange, formatShort,
   pregnancyStatus, upcomingReminders, type AppData, type Confidence, type Goal,
 } from '../engine';
 import { ConfidenceBadge, Icon, MedicalNote, PageTitle, Segmented, Toast, ToggleRow, useToast } from '../ui/components';
@@ -148,17 +148,25 @@ export function PregnancyView() {
   const [due, setDue] = useState('');
   if (!data) return null;
   const p = data.pregnancy;
+  const dueOk = !!due && due >= today && due <= addDays(today, 280);
+  const lmpOk = !!lmp && lmp <= today && lmp >= addDays(today, -300);
+  const datesForm = (label: string, apply: () => void) => (
+    <div className="card stack" style={{ '--gap': '12px' } as React.CSSProperties}>
+      <div className="field"><label htmlFor="pdue">Due date from your clinician (most accurate)</label><input id="pdue" className="input" type="date" min={today} max={addDays(today, 280)} value={due} onChange={(e) => setDue(e.target.value)} /></div>
+      {due && !dueOk && <p className="small" role="alert" style={{ color: 'var(--berry-ink)' }}>Choose a due date between today and 40 weeks from now.</p>}
+      <div className="field"><label htmlFor="plmp">Or first day of your last period</label><input id="plmp" className="input" type="date" min={addDays(today, -300)} max={today} value={lmp} onChange={(e) => setLmp(e.target.value)} /></div>
+      {lmp && !lmpOk && <p className="small" role="alert" style={{ color: 'var(--berry-ink)' }}>Choose a date in the last 43 weeks.</p>}
+      {lmpOk && !dueOk && <p className="small muted">Estimated due date: {formatLong(dueDateFromLmp(lmp, data.settings.cycle.typicalCycleLength))}</p>}
+      <button className="btn" disabled={!dueOk && !lmpOk} onClick={apply}>{label}</button>
+    </div>
+  );
+  const dates = () => ({ ...(lmpOk ? { lmp } : {}), ...(dueOk ? { clinicianDueDate: due } : {}) });
 
   if (!p) {
     return (
       <div className="stack" style={{ '--gap': '16px', maxWidth: 640 } as React.CSSProperties}>
         <PageTitle eyebrow="Pregnancy mode" title="Switch to pregnancy mode">Pauses cycle predictions and shows a week-by-week calendar. Your cycle history is kept, and you can switch back anytime.</PageTitle>
-        <div className="card stack" style={{ '--gap': '12px' } as React.CSSProperties}>
-          <div className="field"><label htmlFor="pdue">Due date from your clinician (most accurate)</label><input id="pdue" className="input" type="date" min={today} max={addDays(today, 280)} value={due} onChange={(e) => setDue(e.target.value)} /></div>
-          <div className="field"><label htmlFor="plmp">Or first day of your last period</label><input id="plmp" className="input" type="date" max={today} value={lmp} onChange={(e) => setLmp(e.target.value)} /></div>
-          {lmp && !due && <p className="small muted">Estimated due date: {formatLong(dueDateFromLmp(lmp, data.settings.cycle.typicalCycleLength))}</p>}
-          <button className="btn" disabled={!lmp && !due} onClick={() => update((d) => ({ ...d, settings: { ...d.settings, goal: 'pregnant' }, pregnancy: { startedOn: today, ...(lmp ? { lmp } : {}), ...(due ? { clinicianDueDate: due } : {}) } }))}>Start pregnancy mode</button>
-        </div>
+        {datesForm('Start pregnancy mode', () => update((d) => ({ ...d, settings: { ...d.settings, goal: 'pregnant' }, pregnancy: { startedOn: today, ...dates() } })))}
         <MedicalNote>Ondessa is not a substitute for prenatal care. Please contact a midwife or doctor to arrange care.</MedicalNote>
       </div>
     );
@@ -166,6 +174,14 @@ export function PregnancyView() {
 
   const st = pregnancyStatus(p, today, data.settings.cycle.typicalCycleLength);
   const notes = st ? weekNotes(st.week) : undefined;
+  if (!st) {
+    return (
+      <div className="stack" style={{ '--gap': '16px', maxWidth: 640 } as React.CSSProperties}>
+        <PageTitle eyebrow="Pregnancy" title="Let’s update your dates">The dates saved for this pregnancy can’t be used to work out your week. Enter your clinician’s due date or your last period.</PageTitle>
+        {datesForm('Save dates', () => update((d) => ({ ...d, pregnancy: { startedOn: p.startedOn, ...dates() } })))}
+      </div>
+    );
+  }
   const endPregnancy = () => {
     if (!window.confirm('End pregnancy mode? Your pregnancy details are kept in your history, and cycle tracking resumes.')) return;
     update((d) => ({ ...d, pregnancy: undefined, pastPregnancies: [...d.pastPregnancies, p], settings: { ...d.settings, goal: 'understand' } }));
@@ -251,7 +267,7 @@ export function Insights() {
         <div className="row between wrap-row"><h3>Prediction confidence</h3><ConfidenceBadge level={f.confidence} /></div>
         <div className="stack" style={{ '--gap': '8px' } as React.CSSProperties}>
           {levels.map((l) => (
-            <div key={l} className="row" style={{ alignItems: 'flex-start', opacity: l === f.confidence ? 1 : 0.55 }}>
+            <div key={l} className={`row ${l === f.confidence ? '' : 'muted'}`} style={{ alignItems: 'flex-start' }}>
               <span style={{ marginTop: 2 }}>{l === f.confidence ? <Icon name="check" size={18} /> : <span style={{ display: 'inline-block', width: 18 }} />}</span>
               <span className="small"><strong>{CONFIDENCE_COPY[l].label}.</strong> {CONFIDENCE_COPY[l].detail}</span>
             </div>
@@ -363,8 +379,13 @@ export function Settings() {
         <h3>Life stage</h3>
         <select className="input" value={s.goal} aria-label="Life stage" onChange={(e) => {
           const goal = e.target.value as Goal;
-          if (goal === 'pregnant') navigate('/app/pregnancy');
-          else set({ goal, ...(goal === 'conceive' ? { showFertility: true, fertilitySigns: true } : {}) });
+          if (goal === 'pregnant') return navigate('/app/pregnancy');
+          if (data.pregnancy && !window.confirm('End pregnancy mode? Your pregnancy details are kept in your history, and cycle tracking resumes.')) return;
+          update((d) => ({
+            ...d,
+            ...(d.pregnancy ? { pregnancy: undefined, pastPregnancies: [...d.pastPregnancies, d.pregnancy] } : {}),
+            settings: { ...d.settings, goal, ...(goal === 'conceive' ? { showFertility: true, fertilitySigns: true } : {}) },
+          }));
         }}>
           <option value="understand">Understanding my cycle</option>
           <option value="conceive">Planning a pregnancy</option>
@@ -521,9 +542,9 @@ export function Membership() {
   const active = entitlement.status === 'active';
   const planName = !active ? 'None' : entitlement.plan === 'preview' ? 'Preview pass' : entitlement.plan === 'annual' ? 'Yearly' : 'Monthly';
   const renewal = !active ? '—'
-    : entitlement.preview ? `Ends ${formatLong(new Date(entitlement.expires * 1000).toISOString().slice(0, 10))}`
+    : entitlement.preview ? `Ends ${formatLong(localToday(new Date(entitlement.expires * 1000)))}`
       : entitlement.store ? `Managed by ${storeName}`
-        : `Renews or ends ${formatLong(new Date(entitlement.expires * 1000).toISOString().slice(0, 10))}`;
+        : `Renews or ends ${formatLong(localToday(new Date(entitlement.expires * 1000)))}`;
   return (
     <div className="stack" style={{ '--gap': '14px', maxWidth: 640 } as React.CSSProperties}>
       <PageTitle eyebrow="Membership" title={active ? 'You’re a member' : 'No active membership'} />

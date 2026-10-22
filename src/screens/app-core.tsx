@@ -20,7 +20,7 @@ const TABS = [
 ];
 
 export function AppShell({ path, children }: { path: string; children: React.ReactNode }) {
-  const { tour, exitTour, today, storageError, notice } = useStore();
+  const { tour, exitTour, today, storageError, notice, selectDate } = useStore();
   return (
     <div className="app">
       {tour && (
@@ -48,7 +48,7 @@ export function AppShell({ path, children }: { path: string; children: React.Rea
           {TABS.map((t) => {
             const current = t.to === '/app' ? path === '/app' : path.startsWith(t.to);
             return (
-              <Link key={t.to} to={t.to} className={t.icon === 'plus' ? 'log-tab' : undefined} aria-current={current ? 'page' : undefined}>
+              <Link key={t.to} to={t.to} className={t.icon === 'plus' ? 'log-tab' : undefined} aria-current={current ? 'page' : undefined} onClick={t.icon === 'plus' ? () => selectDate(today) : undefined}>
                 <span className={t.icon === 'plus' ? 'plus' : undefined}><Icon name={t.icon} size={t.icon === 'plus' ? 24 : 22} /></span>
                 <span>{t.label}</span>
               </Link>
@@ -159,7 +159,7 @@ export function Home() {
             <span className="tiny faint mono">{formatShort(today).toUpperCase()}</span>
           </div>
           <QuickLog showFlow={showFlowFirst(f, today)} />
-          <p className="small faint">{todayLog ? summarizeLog(todayLog) : 'Nothing logged yet. Every field is optional.'}</p>
+          <p className="small faint">{todayLog ? summarizeLog(todayLog, data.settings.temperatureUnit) : 'Nothing logged yet. Every field is optional.'}</p>
           <button className="btn secondary" onClick={() => { selectDate(today); navigate('/app/log'); }}>Add symptoms, mood & more</button>
         </section>
 
@@ -222,12 +222,12 @@ function WeekStrip() {
               key={d}
               type="button"
               className={`phase-${ph ?? 'none'} ${d === today ? 'is-today' : ''}`}
-              aria-label={`${formatLong(d)}${ph ? `, ${PHASE_COPY[ph].label}${future ? ' (estimate)' : ''}` : ''}`}
               aria-current={d === today ? 'date' : undefined}
               onClick={() => { selectDate(d); navigate(future ? '/app/calendar' : '/app/log'); }}
             >
-              <span className="wd">{letters[weekday(d)]}</span>
+              <span className="wd">{letters[weekday(d)]}</span>{' '}
               <span className="dn">{Number(d.slice(8))}</span>
+              <span className="sr-only">, {formatLong(d)}{ph ? `, ${PHASE_COPY[ph].label}${future ? ' (estimate)' : ''}` : ''}</span>
               <span className={`pd ${ph ? (future ? 'predicted' : '') : 'none'}`} />
             </button>
           );
@@ -237,7 +237,7 @@ function WeekStrip() {
   );
 }
 
-function summarizeLog(l: DayLog): string {
+function summarizeLog(l: DayLog, unit: 'C' | 'F' = 'C'): string {
   const parts: string[] = [];
   if (l.flow) parts.push(l.flow === 'unspecified' ? 'period' : l.flow === 'spotting' ? 'spotting' : `${l.flow} flow`);
   if (l.symptoms?.length) parts.push(l.symptoms.join(', '));
@@ -247,7 +247,7 @@ function summarizeLog(l: DayLog): string {
   if (l.sleep) parts.push(`sleep ${l.sleep}/5`);
   if (l.mucus) parts.push(`${l.mucus === 'eggwhite' ? 'egg-white' : l.mucus} mucus`);
   if (l.lh) parts.push(`LH ${l.lh}`);
-  if (l.bbt !== undefined) parts.push(`${l.bbt.toFixed(2)}°C`);
+  if (l.bbt !== undefined) parts.push(unit === 'C' ? `${l.bbt.toFixed(2)}°C` : `${((l.bbt * 9) / 5 + 32).toFixed(1)}°F`);
   if (l.intercourse) parts.push('intimacy');
   if (l.note) parts.push('note');
   return parts.length ? `Logged: ${parts.join(' · ')}` : 'Nothing logged yet.';
@@ -317,7 +317,12 @@ export function Calendar() {
   };
   const heads = data.settings.weekStartsOn === 1 ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'] : ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
   const sel = data.logs[selectedDate];
-  const kind = classifyDay(f, data.logs, selectedDate, data.settings.showFertility && !data.pregnancy);
+  // During pregnancy the calendar shows only what was logged, never cycle predictions.
+  const kindOf = (d: ISODate) => {
+    const k = classifyDay(f, data.logs, d, data.settings.showFertility && !data.pregnancy);
+    return data.pregnancy && k !== 'period' && k !== 'spotting' ? 'none' : k;
+  };
+  const kind = kindOf(selectedDate);
   const kindLabel: Record<string, string> = {
     period: 'Period (logged)', spotting: 'Spotting (logged)', 'predicted-period': 'Predicted period',
     'possible-period': 'Period possible (expected window)', fertile: 'Estimated fertile window', ovulation: 'Estimated ovulation day', none: '',
@@ -326,7 +331,7 @@ export function Calendar() {
 
   return (
     <div className="stack" style={{ '--gap': '18px' } as React.CSSProperties}>
-      <section className="card" style={{ padding: 12 }}>
+      <section className="card" style={{ padding: 8 }}>
         <div className="row between" style={{ marginBottom: 14 }}>
           <button className="btn ghost" aria-label="Previous month" onClick={() => move(-1)}><Icon name="back" /></button>
           <h2 style={{ fontSize: '1.4rem' }} aria-live="polite">{monthName(cursor.m)} {cursor.y}</h2>
@@ -335,7 +340,7 @@ export function Calendar() {
         <div className="cal-head" aria-hidden="true">{heads.map((h, i) => <span key={i}>{h}</span>)}</div>
         <div className="cal" aria-label={`${monthName(cursor.m)} ${cursor.y}`}>
           {grid.map((d) => {
-            const k = classifyDay(f, data.logs, d, data.settings.showFertility && !data.pregnancy);
+            const k = kindOf(d);
             const l = data.logs[d];
             const hasDetails = !!(l && (l.symptoms?.length || l.mood || l.note || l.lh || l.bbt || l.mucus));
             const cls = ['day', k !== 'none' ? k : '', d.startsWith(monthPrefix) ? '' : 'out', d === today ? 'today' : '', d === selectedDate ? 'selected' : ''].join(' ');
@@ -365,7 +370,7 @@ export function Calendar() {
           </div>
           {selectedDate <= today && <button className="btn" onClick={() => navigate('/app/log')}>{sel ? 'Edit' : 'Log'}</button>}
         </div>
-        {sel ? <p className="small muted">{summarizeLog(sel)}</p> : <p className="small faint">{selectedDate > today ? 'Future dates show estimates only.' : 'Nothing logged.'}</p>}
+        {sel ? <p className="small muted">{summarizeLog(sel, data.settings.temperatureUnit)}</p> : <p className="small faint">{selectedDate > today ? 'Future dates show estimates only.' : 'Nothing logged.'}</p>}
         {selectedDate <= today && <QuickFlow date={selectedDate} />}
       </section>
       {f.nextPeriod && !data.pregnancy && (

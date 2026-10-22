@@ -59,7 +59,7 @@ function Routes() {
 }
 
 function appScreen(path: string) {
-  if (path.startsWith('/app/library/')) return <ArticleView slug={path.slice(13)} />;
+  if (path.startsWith('/app/library/')) return <ArticleView slug={path.slice(13)} base="/app/library" />;
   switch (path) {
     case '/app': return <Home />;
     case '/app/calendar': return <Calendar />;
@@ -70,7 +70,7 @@ function appScreen(path: string) {
     case '/app/more': return <More />;
     case '/app/settings': return <Settings />;
     case '/app/privacy': return <PrivacyCenter />;
-    case '/app/library': return <LibraryList />;
+    case '/app/library': return <LibraryList base="/app/library" />;
     case '/app/membership': return <Membership />;
     default: return <Home />;
   }

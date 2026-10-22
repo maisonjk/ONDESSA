@@ -13,7 +13,8 @@
     "test:tz": "TZ=UTC vitest run && TZ=America/Los_Angeles vitest run && TZ=Pacific/Auckland vitest run && TZ=Australia/Lord_Howe vitest run",
     "licenses": "node scripts/license-inventory.mjs",
     "release:check": "node scripts/release-check.mjs",
-    "build:native": "vite build && cap sync"
+    "build:native": "vite build && cap sync",
+    "test:e2e": "node e2e/run.cjs --serve"
   },
   "dependencies": {
     "@aparajita/capacitor-biometric-auth": "10.0.0",
@@ -43,6 +44,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
+    "axe-core": "4.14.0",
     "fake-indexeddb": "^6.2.6",
     "typescript": "^7.0.2",
     "vite": "^8.3.5",

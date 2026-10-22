@@ -214,3 +214,16 @@ describe('save queue', () => {
     expect(loaded.logs['2026-03-20']?.note).toBe('Private note ✨');
   });
 });
+
+describe('passcode removal', () => {
+  it('stores data unencrypted again when the key is removed', async () => {
+    await eraseEverything();
+    const p = new Persister((d, k) => save(d, k), () => {}, 0);
+    await p.saveNow(sample(), await deriveKeyInfo('2468', undefined, FAST));
+    expect((await readStored())?.mode).toBe('locked');
+    await p.saveNow(sample(), null);
+    expect((await readStored())?.mode).toBe('plain');
+    await p.saveNow(sample()); // omitted key keeps the current (none)
+    expect((await readStored())?.mode).toBe('plain');
+  });
+});

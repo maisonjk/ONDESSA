@@ -61,7 +61,6 @@ module.exports = [
   },
   {
     name: 'Membership end date is the local calendar date (Los Angeles)',
-    bug: 'BUG-10',
     async run() {
       const at = new Date('2026-10-23T06:30:00Z'); // Oct 22, 23:30 in LA
       const { page } = await L.open({ timezoneId: 'America/Los_Angeles' });

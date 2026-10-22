@@ -127,7 +127,6 @@ module.exports = [
   },
   {
     name: 'log summary shows temperature in the user’s unit (°F)',
-    bug: 'BUG-09',
     async run() {
       const { page } = await L.open();
       const d = base({ fertilitySigns: true, temperatureUnit: 'F' });
@@ -209,7 +208,6 @@ module.exports = [
   },
   {
     name: 'Log (+) tab opens today after a past day was edited',
-    bug: 'BUG-08',
     async run() {
       const { page } = await L.open();
       await L.seed(page, base(), { route: '/app/log' });

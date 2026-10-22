@@ -100,7 +100,6 @@ module.exports = [
   },
   {
     name: 'pregnant (LMP): Plans page must not promise a next-period prediction',
-    bug: 'BUG-05',
     async run() {
       const { page } = await L.open();
       await L.onboard(page, { goal: 'pregnant', lmp: L.addDays(T, -20) });
@@ -110,7 +109,6 @@ module.exports = [
   },
   {
     name: 'pregnant: a due date beyond the allowed range is rejected at setup',
-    bug: 'BUG-12',
     async run() {
       const { page } = await L.open();
       await L.onboard(page, { goal: 'pregnant', dueDate: L.addDays(T, 400), stopBeforeFinish: true }).catch(() => {});

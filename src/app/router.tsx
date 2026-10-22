@@ -31,7 +31,7 @@ export function usePath(): string {
   return path;
 }
 
-export function Link(props: { to: string; className?: string; children: React.ReactNode; 'aria-current'?: 'page' }) {
+export function Link(props: { to: string; className?: string; children: React.ReactNode; 'aria-current'?: 'page'; onClick?: () => void }) {
   return (
     <a
       href={`#${props.to}`}
@@ -40,6 +40,7 @@ export function Link(props: { to: string; className?: string; children: React.Re
       onClick={(e) => {
         if (e.metaKey || e.ctrlKey || e.shiftKey) return;
         e.preventDefault();
+        props.onClick?.();
         navigate(props.to);
       }}
     >

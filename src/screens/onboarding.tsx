@@ -32,7 +32,9 @@ export function Onboarding() {
   const showFertile = fertile ?? goal === 'conceive';
 
   const pinOk = !usePin || (/^\d{4,8}$/.test(pin) && pin === pin2);
-  const dateOk = goal === 'pregnant' ? !!(lastStart || dueDate) : unsure || !!lastStart;
+  const dueOk = !!dueDate && dueDate >= today && dueDate <= addDays(today, 280);
+  const lmpOk = !!lastStart && lastStart <= today && lastStart >= addDays(today, goal === 'pregnant' ? -300 : -365);
+  const dateOk = goal === 'pregnant' ? dueOk || lmpOk : unsure || lmpOk;
 
   const finish = async () => {
     const d = emptyData(today);
@@ -42,9 +44,9 @@ export function Onboarding() {
     d.settings.fertilitySigns = goal === 'conceive';
     d.settings.reminders.discreet = discreet;
     d.settings.reminders.fertileWindow = goal === 'conceive';
-    if (lastStart && !unsure) d.logs[lastStart] = { date: lastStart, flow: 'unspecified' };
+    if (lmpOk && !unsure) d.logs[lastStart] = { date: lastStart, flow: 'unspecified' };
     if (goal === 'pregnant') {
-      d.pregnancy = { startedOn: today, ...(lastStart ? { lmp: lastStart } : {}), ...(dueDate ? { clinicianDueDate: dueDate } : {}) };
+      d.pregnancy = { startedOn: today, ...(lmpOk ? { lmp: lastStart } : {}), ...(dueOk ? { clinicianDueDate: dueDate } : {}) };
       d.settings.reminders.periodHeadsUp = false;
     }
     await begin(d, usePin ? pin : undefined);
@@ -186,8 +188,8 @@ export function LockScreen() {
   const [busy, setBusy] = useState(false);
   const [forgot, setForgot] = useState(false);
   const [armed, setArmed] = useState(false);
-  const [failures, setFailures] = useState(0);
-  const [waitUntil, setWaitUntil] = useState(0);
+  const [failures, setFailures] = useState(() => readLockout().n);
+  const [waitUntil, setWaitUntil] = useState(() => readLockout().until);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     if (waitUntil <= Date.now()) return;
@@ -221,10 +223,14 @@ export function LockScreen() {
       const n = failures + 1;
       setFailures(n);
       // After 5 wrong tries, wait 30s, doubling each time (capped at 15 minutes).
-      if (n >= 5) {
-        setWaitUntil(Date.now() + Math.min(15 * 60, 30 * 2 ** (n - 5)) * 1000);
+      const until = n >= 5 ? Date.now() + Math.min(15 * 60, 30 * 2 ** (n - 5)) * 1000 : 0;
+      if (until) {
+        setWaitUntil(until);
         setNow(Date.now());
       }
+      writeLockout({ n, until });
+    } else {
+      writeLockout({ n: 0, until: 0 });
     }
   };
   return (
@@ -301,4 +307,24 @@ function RestoreBackup() {
       </div>
     </details>
   );
+}
+
+/** Failed-unlock count and wait, kept across reloads so the lockout can't be skipped. */
+const LOCKOUT_KEY = 'ondessa.unlockAttempts';
+
+function readLockout(): { n: number; until: number } {
+  try {
+    const v = JSON.parse(localStorage.getItem(LOCKOUT_KEY) ?? '{}') as { n?: unknown; until?: unknown };
+    return { n: typeof v.n === 'number' ? v.n : 0, until: typeof v.until === 'number' ? v.until : 0 };
+  } catch {
+    return { n: 0, until: 0 };
+  }
+}
+
+function writeLockout(v: { n: number; until: number }): void {
+  try {
+    localStorage.setItem(LOCKOUT_KEY, JSON.stringify(v));
+  } catch {
+    /* storage unavailable */
+  }
 }

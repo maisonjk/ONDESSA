@@ -48,10 +48,13 @@ export class Persister {
     return this.chain;
   }
 
-  /** Save `data` immediately (setup, restore, passcode change). */
-  async saveNow(data: AppData, key: KeyInfo | undefined = this.key): Promise<void> {
+  /**
+   * Save `data` immediately (setup, restore, passcode change).
+   * `key`: a KeyInfo encrypts with that key, `null` stores unencrypted, omitted keeps the current key.
+   */
+  async saveNow(data: AppData, key?: KeyInfo | null): Promise<void> {
     if (this.closed) throw new Error('Storage is closed');
-    this.key = key;
+    if (key !== undefined) this.key = key ?? undefined;
     this.latest = data;
     this.dirty = true;
     await this.flush();

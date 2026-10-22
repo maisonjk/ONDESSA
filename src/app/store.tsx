@@ -92,9 +92,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
-  // Keep "today" correct across midnight without reloading.
+  // Keep "today" correct across midnight without reloading; a selection of the old
+  // "today" moves forward with it.
   useEffect(() => {
-    const id = window.setInterval(() => setToday(localToday()), 60_000);
+    const id = window.setInterval(() => {
+      const now = localToday();
+      setToday((prev) => {
+        if (prev !== now) selectDate((sel) => (sel === prev ? now : sel));
+        return now;
+      });
+    }, 60_000);
     return () => window.clearInterval(id);
   }, []);
 
@@ -158,7 +165,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (typeof BroadcastChannel === 'undefined') return;
     const ch = new BroadcastChannel('ondessa');
     channel.current = ch;
-    ch.onmessage = async () => {
+    ch.onmessage = async (e: MessageEvent) => {
+      if (e.data === 'erased') {
+        // Another tab deleted everything: stop writing here too, so nothing comes back.
+        await persister.close();
+        persister.reset();
+        tourRef.current = false;
+        setTour(false);
+        setData(undefined);
+        setStored(undefined);
+        setEntitlement({ status: 'none' });
+        setPhase('new');
+        return;
+      }
       if (tourRef.current) return;
       const s = await readStored().catch(() => undefined);
       if (!s) return;
@@ -212,7 +231,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (tourRef.current) throw new TourWriteError();
       const key = code ? await deriveKeyInfo(code) : undefined;
       persister.reset(key);
-      await persister.saveNow(d, key);
+      await persister.saveNow(d, key ?? null);
       setStored(await readStored());
       if (typeof navigator !== 'undefined' && navigator.storage?.persist) {
         void navigator.storage.persist();
@@ -244,7 +263,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     async (code: string | undefined) => {
       if (tourRef.current) throw new TourWriteError();
       if (!data) return;
-      const key = code ? await deriveKeyInfo(code) : undefined;
+      const key = code ? await deriveKeyInfo(code) : null;
       await persister.saveNow(data, key);
       await disableBiometricUnlock(); // quick unlock must be re-enabled for a new passcode
       setStored(await readStored());
@@ -278,6 +297,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     clearEntitlement();
     await disableBiometricUnlock();
     const ok = await eraseEverything();
+    channel.current?.postMessage('erased');
     persister.reset();
     setData(undefined);
     setStored(undefined);

@@ -261,7 +261,8 @@ async function noHorizontalScroll(page) {
 }
 
 const AXE_SRC = (() => {
-  const p = process.env.AXE_PATH || '/tmp/qa/node_modules/axe-core/axe.min.js';
+  const local = path.join(__dirname, '..', 'node_modules', 'axe-core', 'axe.min.js');
+  const p = process.env.AXE_PATH || (require('fs').existsSync(local) ? local : '/tmp/qa/node_modules/axe-core/axe.min.js');
   return fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : undefined;
 })();
 
