@@ -46,7 +46,7 @@ export function Fertility() {
 
       {f.fertile && f.lastPeriod && (
         <section className="card stack" style={{ '--gap': '14px' } as React.CSSProperties}>
-          <div className="row between"><h3>This cycle</h3><ConfidenceBadge level={f.confidence} /></div>
+          <div className="row between wrap-row" style={{ '--gap': '8px' } as React.CSSProperties}><h3>This cycle</h3><ConfidenceBadge level={f.confidence} /></div>
           <FertilityStrip start={f.lastPeriod.start} end={f.nextPeriod!.latest} today={today} f={f} />
           <p className="small muted">
             Most likely: {formatRange(f.fertile.start, f.fertile.end)}. Because your next period could fall anywhere from {formatShort(f.nextPeriod!.earliest)} to {formatShort(f.nextPeriod!.latest)}, and the phase after ovulation varies from {RULES.lutealRange.min} to {RULES.lutealRange.max} days, fertile days could fall anywhere from {formatShort(f.fertile.widestStart)} to {formatShort(f.fertile.widestEnd)}.
@@ -452,7 +452,7 @@ export function PrivacyCenter() {
 
       <section className="card stack" style={{ '--gap': '10px' } as React.CSSProperties}>
         <h3>What’s stored, and where</h3>
-        <p className="small muted">On this device only: {counts.days} logged days, {counts.notes} notes, {counts.appts} appointments, your settings{data.pregnancy ? ' and pregnancy details' : ''}. {locked ? 'Encrypted with your passcode.' : 'Not encrypted. Anyone who can open this browser can view it.'}</p>
+        <p className="small muted">On this device only: {plural(counts.days, 'logged day')}, {plural(counts.notes, 'note')}, {plural(counts.appts, 'appointment')}, your settings{data.pregnancy ? ' and pregnancy details' : ''}. {locked ? 'Encrypted with your passcode.' : 'Not encrypted. Anyone who can open this browser can view it.'}</p>
         <p className="small muted">Sent to us or anyone else: nothing about your health. No analytics, ads or AI services run in Ondessa.</p>
         <Link to="/privacy" className="btn ghost" >Full privacy summary <Icon name="chevron" size={16} /></Link>
       </section>
@@ -523,4 +523,8 @@ export function Membership() {
       </section>
     </div>
   );
+}
+
+function plural(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? '' : 's'}`;
 }
