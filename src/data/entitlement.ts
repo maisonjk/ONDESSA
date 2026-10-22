@@ -1,3 +1,6 @@
+import { isNative } from '../platform';
+import { ownedPlan } from '../platform/purchases';
+
 /**
  * Privacy-preserving entitlements (see docs/02-architecture.md, ADR-0003).
  *
@@ -19,7 +22,8 @@ export interface EntitlementPayload {
 }
 
 export type Entitlement =
-  | { status: 'active'; plan: Plan; expires: number; eid: string; preview?: false }
+  /** `store`: bought through the App Store or Google Play; renewal is managed there (expires 0). */
+  | { status: 'active'; plan: Plan; expires: number; eid: string; preview?: false; store?: boolean }
   | { status: 'active'; plan: 'preview'; expires: number; preview: true }
   | { status: 'loading' | 'expired' | 'none' | 'invalid' };
 
@@ -78,11 +82,15 @@ function configuredPublicKey(): JsonWebKey | undefined {
   }
 }
 
-/** Preview passes exist only in development or explicitly-flagged preview builds. */
+/** Preview passes exist only in development or explicitly-flagged web preview builds, never in the apps. */
 export const previewPassAvailable =
-  import.meta.env.DEV || import.meta.env.VITE_PREVIEW_PASS === 'true';
+  !isNative && (import.meta.env.DEV || import.meta.env.VITE_PREVIEW_PASS === 'true');
 
 export async function currentEntitlement(): Promise<Entitlement> {
+  if (isNative) {
+    const plan = await ownedPlan().catch(() => undefined);
+    return plan ? { status: 'active', plan, expires: 0, eid: 'store', store: true } : { status: 'none' };
+  }
   let stored: string | null = null;
   try {
     stored = localStorage.getItem(STORAGE_KEY);

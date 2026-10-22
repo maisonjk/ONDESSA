@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  findPatterns, forecast, localToday, sanitizeLog, ValidationError,
+  findPatterns, forecast, localToday, sanitizeLog, upcomingReminders, ValidationError,
   type AppData, type DayLog, type Forecast, type Goal, type Insight, type ISODate,
 } from '../engine';
 import { deriveKeyInfo, WrongPassphraseError } from '../data/crypto';
@@ -10,6 +10,10 @@ import {
 import { Persister } from '../data/persister';
 import { eraseEverything, loadPlain, readStored, reloadWithKey, save, unlock, type Stored } from '../data/vault';
 import { tourData } from './tour';
+import { tap } from '../platform';
+import { disableBiometricUnlock } from '../platform/biometric';
+import { syncReminders } from '../platform/notifications';
+import { onStoreChange } from '../platform/purchases';
 import { useToast } from '../ui/components';
 
 export type Phase = 'loading' | 'new' | 'locked' | 'ready' | 'unavailable';
@@ -181,7 +185,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   );
 
   const setLog = useCallback(
-    (log: DayLog) =>
+    (log: DayLog) => {
+      tap();
       update((d) => {
         const clean = sanitizeLog(log);
         const logs = { ...d.logs };
@@ -189,7 +194,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         if (Object.keys(rest).length === 0) delete logs[date];
         else logs[date] = clean;
         return { ...d, logs };
-      }),
+      });
+    },
     [update],
   );
 
@@ -240,6 +246,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (!data) return;
       const key = code ? await deriveKeyInfo(code) : undefined;
       await persister.saveNow(data, key);
+      await disableBiometricUnlock(); // quick unlock must be re-enabled for a new passcode
       setStored(await readStored());
     },
     [data, persister],
@@ -269,6 +276,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (tourRef.current) throw new TourWriteError();
     await persister.close(); // wait for any in-flight save so nothing is written back
     clearEntitlement();
+    await disableBiometricUnlock();
     const ok = await eraseEverything();
     persister.reset();
     setData(undefined);
@@ -282,6 +290,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const fc = useMemo(() => (data ? forecast(data, today) : undefined), [data, today]);
   const insights = useMemo(() => (fc && data ? findPatterns(fc, data.logs) : []), [fc, data]);
+
+  // Native apps: keep scheduled local notifications in step with the latest predictions.
+  useEffect(() => {
+    if (tour || !data || !fc) return;
+    const t = window.setTimeout(() => void syncReminders(upcomingReminders(data, fc, today, 60), today).catch(() => {}), 1000);
+    return () => window.clearTimeout(t);
+  }, [data, fc, today, tour]);
+
+  // App Store / Google Play purchases, renewals and refunds update access immediately.
+  useEffect(() => onStoreChange(() => void refreshEntitlement()), [refreshEntitlement]);
 
   const value: Store = {
     phase, today, tour, data, forecast: fc, insights, entitlement,

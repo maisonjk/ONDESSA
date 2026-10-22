@@ -1,10 +1,13 @@
 import { sanitizeData, type AppData } from '../engine';
+import { isNative } from '../platform';
+import { deleteVaultFile, readVaultFile, writeVaultFile } from '../platform/files';
 import { decryptWithKey, encryptWithKey, isEnvelope, openEnvelope, type Envelope, type KeyInfo } from './crypto';
 
 /**
- * Local-first storage. All health data lives in one IndexedDB record on this device,
- * either as plain JSON or, when app lock is on, as an AES-GCM envelope. Nothing here
- * talks to the network.
+ * Local-first storage. All health data lives in one record on this device, either as
+ * plain JSON or, when app lock is on, as an AES-GCM envelope. On the web the record is in
+ * IndexedDB; in the iOS/Android app it is a private file that the system never evicts.
+ * Nothing here talks to the network.
  */
 const DB_NAME = 'ondessa';
 const STORE = 'vault';
@@ -38,8 +41,26 @@ async function tx<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBReq
   }
 }
 
+async function readRaw(): Promise<Stored | undefined> {
+  if (!isNative) return (await tx('readonly', (s) => s.get(KEY))) as Stored | undefined;
+  const text = await readVaultFile();
+  if (text) return JSON.parse(text) as Stored;
+  // First launch of the native build: move anything stored in the WebView into the file.
+  const legacy = (await tx('readonly', (s) => s.get(KEY)).catch(() => undefined)) as Stored | undefined;
+  if (legacy) {
+    await writeVaultFile(JSON.stringify(legacy));
+    await deleteIndexedDb().catch(() => {});
+  }
+  return legacy;
+}
+
+async function writeRaw(value: Stored): Promise<void> {
+  if (isNative) await writeVaultFile(JSON.stringify(value));
+  else await tx('readwrite', (s) => s.put(value, KEY));
+}
+
 export async function readStored(): Promise<Stored | undefined> {
-  const raw = (await tx('readonly', (s) => s.get(KEY))) as Stored | undefined;
+  const raw = await readRaw();
   if (!raw) return undefined;
   if (raw.mode === 'locked' && isEnvelope(raw.envelope)) return raw;
   if (raw.mode === 'plain') return raw;
@@ -64,10 +85,10 @@ export async function save(data: AppData, key?: KeyInfo): Promise<void> {
   const value: Stored = key
     ? { mode: 'locked', envelope: await encryptWithKey(data, key) }
     : { mode: 'plain', data };
-  await tx('readwrite', (s) => s.put(value, KEY));
+  await writeRaw(value);
 }
 
-function deleteDatabase(): Promise<void> {
+function deleteIndexedDb(): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     const req = indexedDB.deleteDatabase(DB_NAME);
     req.onsuccess = () => resolve();
@@ -81,7 +102,8 @@ function deleteDatabase(): Promise<void> {
  * the database to verify nothing remains. Returns true only if verification passes.
  */
 export async function eraseEverything(): Promise<boolean> {
-  await deleteDatabase();
+  await deleteIndexedDb();
+  if (isNative) await deleteVaultFile();
   try {
     for (const k of Object.keys(localStorage)) if (k.startsWith('ondessa.')) localStorage.removeItem(k);
     sessionStorage.clear();
@@ -92,6 +114,6 @@ export async function eraseEverything(): Promise<boolean> {
     for (const name of await caches.keys()) await caches.delete(name);
   }
   const empty = (await readStored()) === undefined;
-  await deleteDatabase(); // the check re-creates an empty database; remove it too
+  await deleteIndexedDb(); // the check re-creates an empty database; remove it too
   return empty;
 }

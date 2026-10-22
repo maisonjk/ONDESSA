@@ -3,6 +3,7 @@ import { navigate } from '../app/router';
 import { useStore } from '../app/store';
 import { addDays, emptyData, type Goal } from '../engine';
 import { BackupNeedsPassword, readBackup } from '../data/backup';
+import { biometricPasscode, biometricUnlockEnabled, biometryAvailable } from '../platform/biometric';
 import { WrongPassphraseError } from '../data/crypto';
 import { Icon, Mark, MedicalNote, ToggleRow } from '../ui/components';
 
@@ -194,6 +195,20 @@ export function LockScreen() {
     return () => window.clearInterval(id);
   }, [waitUntil]);
   const waiting = Math.max(0, Math.ceil((waitUntil - now) / 1000));
+  const [quick, setQuick] = useState<string>();
+  const quickUnlock = async () => {
+    const code = await biometricPasscode();
+    if (code && !(await unlockWith(code))) setError(true);
+  };
+  useEffect(() => {
+    void Promise.all([biometricUnlockEnabled(), biometryAvailable()]).then(([on, b]) => {
+      if (on && b.available) {
+        setQuick(b.label);
+        void quickUnlock();
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (waiting) return;
@@ -220,6 +235,7 @@ export function LockScreen() {
         <input className="input pin" type="password" inputMode="numeric" autoFocus autoComplete="current-password" aria-label="Passcode" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))} />
         {error && <p className="small" role="alert" style={{ color: 'var(--berry-ink)' }}>{waiting ? `Too many attempts. Try again in ${waiting}s.` : 'That passcode didn’t work.'}</p>}
         <button className="btn block" disabled={pin.length < 4 || busy || waiting > 0}>{busy ? 'Unlocking…' : 'Unlock'}</button>
+        {quick && <button type="button" className="btn secondary block" onClick={quickUnlock}>Unlock with {quick}</button>}
         {!forgot ? (
           <button type="button" className="btn ghost" onClick={() => setForgot(true)}>Forgot passcode?</button>
         ) : (

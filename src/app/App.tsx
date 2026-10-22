@@ -7,6 +7,7 @@ import {
   ArticlePage, ArticleView, Deleted, Help, Landing, Legal, LibraryIndex, LibraryList, Plans, PrivacyPolicy,
 } from '../screens/public';
 import { navigate, usePath } from './router';
+import { isNative } from '../platform';
 import { useStore } from './store';
 
 export function App() {
@@ -33,6 +34,9 @@ function Routes() {
   if (phase === 'unavailable' && !tour) return <Unavailable message={store.storageError} />;
   if (phase === 'locked' && !tour) return <LockScreen />;
 
+  // The store apps open straight into the product: no marketing page, no website navigation.
+  if (isNative && (path === '/' || path === '/library')) return <Redirect to={path === '/library' ? '/app/library' : data ? '/app' : '/start'} />;
+  if (isNative && path.startsWith('/library/')) return <Redirect to={`/app${path}`} />;
   if (path === '/') return <Landing />;
   if (path === '/plans') return <Plans />;
   if (path === '/library') return <LibraryIndex />;
@@ -84,7 +88,7 @@ function Redirect({ to }: { to: string }) {
 function useOpenNotification() {
   const { data, forecast, today, tour, phase } = useStore();
   useEffect(() => {
-    if (tour || phase !== 'ready' || !data || !forecast) return;
+    if (isNative || tour || phase !== 'ready' || !data || !forecast) return; // native schedules real notifications
     if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
     try {
       if (localStorage.getItem('ondessa.lastNotice') === today) return;

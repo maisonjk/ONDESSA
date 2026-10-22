@@ -1,4 +1,9 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { isNative, storeName } from '../platform';
+import { biometricUnlockEnabled, biometryAvailable, disableBiometricUnlock, enableBiometricUnlock } from '../platform/biometric';
+import { exportBackup } from '../platform/files';
+import { notificationPermission, requestNotificationPermission } from '../platform/notifications';
+import { manageSubscription, restorePurchases } from '../platform/purchases';
 import { Link, navigate } from '../app/router';
 import { useStore } from '../app/store';
 import { weekNotes } from '../content/library';
@@ -332,11 +337,20 @@ export function More() {
 
 export function Settings() {
   const { data, update, forecast: f, today } = useStore();
-  const [notifState, setNotifState] = useState(() => (typeof Notification === 'undefined' ? 'unsupported' : Notification.permission));
+  const [notifState, setNotifState] = useState<'granted' | 'denied' | 'prompt'>();
+  useEffect(() => {
+    void notificationPermission().then(setNotifState);
+  }, []);
+  const askNotifications = async () => setNotifState((await requestNotificationPermission()) ? 'granted' : 'denied');
   if (!data || !f) return null;
   const s = data.settings;
   const set = (patch: Partial<AppData['settings']>) => update((d) => ({ ...d, settings: { ...d.settings, ...patch } }));
-  const setRem = (patch: Partial<AppData['settings']['reminders']>) => set({ reminders: { ...s.reminders, ...patch } });
+  const setRem = (patch: Partial<AppData['settings']['reminders']>) => {
+    set({ reminders: { ...s.reminders, ...patch } });
+    // Ask for notification permission when a reminder is turned on, never at launch.
+    const turnedOn = Object.entries(patch).some(([k, v]) => k !== 'discreet' && v === true);
+    if (turnedOn && notifState === 'prompt') void askNotifications();
+  };
   const upcoming = upcomingReminders(data, f, today, 30);
 
   return (
@@ -382,9 +396,11 @@ export function Settings() {
         <ToggleRow title="Daily check-in" checked={s.reminders.dailyLog} onChange={(v) => setRem({ dailyLog: v })} />
         <ToggleRow title="Discreet wording" detail="Notifications never mention periods, fertility or pregnancy." checked={s.reminders.discreet} onChange={(v) => setRem({ discreet: v })} />
         <div className="stack small muted" style={{ '--gap': '8px', paddingTop: 12 } as React.CSSProperties}>
-          <p>Reminders are calculated on your device. In the web version, they appear in the app and as a notification when you open it, if you allow notifications. Scheduled background notifications arrive with the iOS and Android apps.</p>
-          {notifState === 'default' && <button className="btn secondary" onClick={async () => setNotifState(await Notification.requestPermission())}>Allow notifications</button>}
-          {notifState === 'denied' && <p>Notifications are blocked in your browser settings.</p>}
+          <p>{isNative
+            ? 'Reminders are scheduled on this device at 9am on the day. Nothing is sent to a server.'
+            : 'Reminders are calculated on your device. On the web they appear in the app and as a notification when you open it.'}</p>
+          {notifState === 'prompt' && <button className="btn secondary" onClick={askNotifications}>Allow notifications</button>}
+          {notifState === 'denied' && <p>Notifications are turned off for Ondessa in your {isNative ? 'device' : 'browser'} settings.</p>}
         </div>
       </section>
 
@@ -420,14 +436,10 @@ export function PrivacyCenter() {
   const download = async (encrypted: boolean) => {
     if (tour) return showToast('The tour has nothing to export.');
     const text = await makeBackup(data, today, encrypted ? backupPass : undefined);
-    const blob = new Blob([text], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `ondessa-backup-${today}${encrypted ? '.encrypted' : ''}.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+    const done = await exportBackup(`ondessa-backup-${today}${encrypted ? '.encrypted' : ''}.json`, text);
+    if (!done) return; // cancelled: don't record a backup that wasn't saved
     update((d) => ({ ...d, lastBackupOn: today }));
-    showToast(encrypted ? 'Encrypted backup downloaded' : 'Backup downloaded');
+    showToast(encrypted ? 'Encrypted backup saved' : 'Backup saved');
   };
 
   const doImport = async (text: string, pass?: string) => {
@@ -452,7 +464,7 @@ export function PrivacyCenter() {
 
       <section className="card stack" style={{ '--gap': '10px' } as React.CSSProperties}>
         <h3>What’s stored, and where</h3>
-        <p className="small muted">On this device only: {plural(counts.days, 'logged day')}, {plural(counts.notes, 'note')}, {plural(counts.appts, 'appointment')}, your settings{data.pregnancy ? ' and pregnancy details' : ''}. {locked ? 'Encrypted with your passcode.' : 'Not encrypted. Anyone who can open this browser can view it.'}</p>
+        <p className="small muted">On this device only: {plural(counts.days, 'logged day')}, {plural(counts.notes, 'note')}, {plural(counts.appts, 'appointment')}, your settings{data.pregnancy ? ' and pregnancy details' : ''}. {locked ? 'Encrypted with your passcode.' : isNative ? 'Not encrypted. Anyone who can unlock this device and open Ondessa can view it.' : 'Not encrypted. Anyone who can open this browser can view it.'}</p>
         <p className="small muted">Sent to us or anyone else: nothing about your health. No analytics, ads or AI services run in Ondessa.</p>
         <Link to="/privacy" className="btn ghost" >Full privacy summary <Icon name="chevron" size={16} /></Link>
       </section>
@@ -465,11 +477,12 @@ export function PrivacyCenter() {
           <button className="btn" disabled={tour || !/^\d{4,8}$/.test(pin)} onClick={async () => { await setPasscode(pin); setPin(''); showToast(locked ? 'Passcode changed' : 'Passcode on: data encrypted'); }}>{locked ? 'Change' : 'Turn on'}</button>
           {locked && <button className="btn secondary" disabled={tour} onClick={async () => { if (window.confirm('Turn off the passcode? Your data will be stored unencrypted on this device.')) { await setPasscode(undefined); showToast('Passcode off'); } }}>Turn off</button>}
         </div>
+        {locked && !tour && <QuickUnlock notify={showToast} />}
       </section>
 
       <section className="card stack" style={{ '--gap': '12px' } as React.CSSProperties}>
         <h3>Backup & export</h3>
-        <p className="small muted">Your data lives only on this device. A backup is the only way to move it or recover it.</p>
+        <p className="small muted">Your data lives only on this device. A backup is the only way to move it or recover it.{isNative ? ' You choose where to save it: Files, AirDrop or another app.' : ''}</p>
         <input className="input" type="password" autoComplete="new-password" placeholder="Backup password (recommended)" aria-label="Backup password" value={backupPass} onChange={(e) => setBackupPass(e.target.value)} />
         <div className="row wrap-row">
           <button className="btn" disabled={backupPass.length < 8} onClick={() => download(true)}><Icon name="download" size={18} /> Encrypted backup</button>
@@ -489,7 +502,7 @@ export function PrivacyCenter() {
 
       <section className="card stack" style={{ '--gap': '12px', borderColor: '#d9a3a3' } as React.CSSProperties}>
         <h3>Delete everything</h3>
-        <p className="small muted">Permanently removes all Ondessa data and your membership key from this device, then checks that nothing remains. This cannot be undone. It does not cancel a subscription; manage that through your store or billing account.</p>
+        <p className="small muted">Permanently removes all Ondessa data and your membership key from this device, then checks that nothing remains. This cannot be undone. It does not cancel a subscription; manage that from Membership.</p>
         <input className="input" placeholder='Type DELETE to confirm' aria-label="Type DELETE to confirm" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} />
         <button className="btn danger" disabled={confirmText !== 'DELETE' || tour} onClick={async () => navigate((await eraseAll()) ? '/deleted' : '/deleted-unverified', true)}><Icon name="trash" size={18} /> Permanently delete</button>
       </section>
@@ -501,26 +514,77 @@ export function PrivacyCenter() {
 /* ------------------------------------------------------------------ Membership (in-app) */
 
 export function Membership() {
-  const { entitlement } = useStore();
+  const { entitlement, refreshEntitlement } = useStore();
+  const [msg, setMsg] = useState<string>();
   const active = entitlement.status === 'active';
-  const until = active ? formatLong(new Date(entitlement.expires * 1000).toISOString().slice(0, 10)) : undefined;
-  const planName = !active ? 'None' : entitlement.plan === 'preview' ? 'Preview pass' : entitlement.plan === 'annual' ? 'Yearly · $59.99' : 'Monthly · $8.99';
+  const planName = !active ? 'None' : entitlement.plan === 'preview' ? 'Preview pass' : entitlement.plan === 'annual' ? 'Yearly' : 'Monthly';
+  const renewal = !active ? '—'
+    : entitlement.preview ? `Ends ${formatLong(new Date(entitlement.expires * 1000).toISOString().slice(0, 10))}`
+      : entitlement.store ? `Managed by ${storeName}`
+        : `Renews or ends ${formatLong(new Date(entitlement.expires * 1000).toISOString().slice(0, 10))}`;
   return (
     <div className="stack" style={{ '--gap': '14px', maxWidth: 640 } as React.CSSProperties}>
       <PageTitle eyebrow="Membership" title={active ? 'You’re a member' : 'No active membership'} />
       <section className="card stack" style={{ '--gap': '4px' } as React.CSSProperties}>
         <div className="row between toggle-row"><span className="muted">Plan</span><strong>{planName}</strong></div>
-        <div className="row between toggle-row"><span className="muted">{entitlement.status === 'active' && entitlement.preview ? 'Ends' : 'Renews or ends'}</span><strong className="mono">{until ?? '—'}</strong></div>
+        <div className="row between toggle-row"><span className="muted">Renewal</span><strong>{renewal}</strong></div>
       </section>
-      <section className="card stack" style={{ '--gap': '10px' } as React.CSSProperties}>
-        <h3>Manage or cancel</h3>
-        <p className="small muted">Subscriptions are managed where you bought them: Settings → Apple ID → Subscriptions on iPhone, Play Store → Payments & subscriptions on Android, or the link in your web receipt. Cancelling keeps access to the end of the paid period and never deletes your data.</p>
-      </section>
-      <section className="card stack" style={{ '--gap': '10px' } as React.CSSProperties}>
-        <h3>Your membership key</h3>
-        <p className="small muted">The key on this device proves your subscription without an account. It holds a random ID, your plan and an expiry date, nothing about your health. To use Ondessa on a new device, restore it from the pricing page.</p>
-        <Link to="/plans" className="btn secondary">Restore or change plan</Link>
-      </section>
+      {isNative ? (
+        <section className="card stack" style={{ '--gap': '10px' } as React.CSSProperties}>
+          <h3>Manage or cancel</h3>
+          <p className="small muted">Change or cancel your plan in {storeName}. Cancelling keeps access to the end of the paid period and never deletes your data.</p>
+          <button className="btn" onClick={() => void manageSubscription()}>Manage subscription</button>
+          <button className="btn secondary" onClick={async () => { const p = await restorePurchases(); await refreshEntitlement(); setMsg(p ? 'Your membership is restored.' : 'No active membership was found for this account.'); }}>Restore purchases</button>
+          {msg && <p className="small" role="status">{msg}</p>}
+        </section>
+      ) : (
+        <>
+          <section className="card stack" style={{ '--gap': '10px' } as React.CSSProperties}>
+            <h3>Manage or cancel</h3>
+            <p className="small muted">Subscriptions are managed where you bought them. Cancelling keeps access to the end of the paid period and never deletes your data.</p>
+          </section>
+          <section className="card stack" style={{ '--gap': '10px' } as React.CSSProperties}>
+            <h3>Your membership key</h3>
+            <p className="small muted">The key on this device proves your subscription without an account. It holds a random ID, your plan and an expiry date, nothing about your health.</p>
+            <Link to="/plans" className="btn secondary">Restore or change plan</Link>
+          </section>
+        </>
+      )}
+      <p className="small row wrap-row" style={{ '--gap': '16px' } as React.CSSProperties}><Link to="/legal">Terms of Use</Link><Link to="/privacy">Privacy Policy</Link></p>
+    </div>
+  );
+}
+
+/** Face ID / Touch ID unlock, offered once a passcode is set. Native only. */
+function QuickUnlock({ notify }: { notify: (m: string) => void }) {
+  const [state, setState] = useState<{ available: boolean; label: string; enabled: boolean }>();
+  const [pin, setPin] = useState('');
+  useEffect(() => {
+    void Promise.all([biometryAvailable(), biometricUnlockEnabled()]).then(([b, enabled]) => setState({ ...b, enabled }));
+  }, []);
+  if (!state?.available) return null;
+  return (
+    <div className="stack" style={{ '--gap': '8px', paddingTop: 8, borderTop: '1px solid var(--line)' } as React.CSSProperties}>
+      <ToggleRow
+        title={`Unlock with ${state.label}`}
+        detail="Your passcode is kept in this device’s secure keychain and never synced."
+        checked={state.enabled}
+        onChange={async (v) => {
+          if (!v) {
+            await disableBiometricUnlock();
+            setState({ ...state, enabled: false });
+            return;
+          }
+          if (!/^\d{4,8}$/.test(pin)) return notify('Enter your current passcode first.');
+          const ok = await enableBiometricUnlock(pin);
+          setPin('');
+          setState({ ...state, enabled: ok });
+          notify(ok ? `${state.label} unlock is on` : `${state.label} wasn’t turned on`);
+        }}
+      />
+      {!state.enabled && (
+        <input className="input pin" style={{ maxWidth: 200 }} type="password" inputMode="numeric" autoComplete="current-password" placeholder="Current passcode" aria-label="Current passcode for quick unlock" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))} />
+      )}
     </div>
   );
 }

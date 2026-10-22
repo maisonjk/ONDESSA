@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, navigate } from '../app/router';
 import { useStore } from '../app/store';
 import { ARTICLES, CATEGORIES, type Article } from '../content/library';
 import type { Goal } from '../engine';
 import { activateToken, previewPassAvailable } from '../data/entitlement';
+import { isNative, openExternal, platform } from '../platform';
+import { loadProducts, purchase, restorePurchases, type StorePlan } from '../platform/purchases';
 import { diffDays, forecast, formatLong, formatShort, localToday, phaseOn, PHASE_COPY } from '../engine';
 import { tourData } from '../app/tour';
 import { ConfidenceBadge, DotRing, Icon, Mark, MedicalNote, PhasePill } from '../ui/components';
@@ -21,12 +23,21 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
     <div>
       <header className="topbar">
         <div className="wrap">
-          <Link to="/" className="wordmark"><Mark /> Ondessa</Link>
-          <nav className="row" style={{ '--gap': '4px' } as React.CSSProperties}>
-            <Link to="/library" className="btn ghost">Library</Link>
-            <Link to="/plans" className="btn ghost">Pricing</Link>
-            {inApp ? <Link to="/app" className="btn">Open</Link> : !setUp && <Link to="/start" className="btn">Start</Link>}
-          </nav>
+          {isNative ? (
+            <>
+              <button className="btn ghost" onClick={() => window.history.back()}><Icon name="back" size={18} /> Back</button>
+              <span className="wordmark"><Mark /> Ondessa</span>
+            </>
+          ) : (
+            <>
+              <Link to="/" className="wordmark"><Mark /> Ondessa</Link>
+              <nav className="row" style={{ '--gap': '4px' } as React.CSSProperties}>
+                <Link to="/library" className="btn ghost">Library</Link>
+                <Link to="/plans" className="btn ghost">Pricing</Link>
+                {inApp ? <Link to="/app" className="btn">Open</Link> : !setUp && <Link to="/start" className="btn">Start</Link>}
+              </nav>
+            </>
+          )}
         </div>
       </header>
       <main>{children}</main>
@@ -36,7 +47,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
             <Link to="/privacy">Privacy</Link>
             <Link to="/legal">Terms & disclaimers</Link>
             <Link to="/help">Help</Link>
-            <Link to="/library">Library</Link>
+            {!isNative && <Link to="/library">Library</Link>}
           </div>
           <MedicalNote />
           <p className="tiny">Ondessa is a working name pending trademark clearance. © 2026.</p>
@@ -140,6 +151,12 @@ export function Plans() {
   const [keyMsg, setKeyMsg] = useState<string>();
   const active = entitlement.status === 'active';
   const saving = Math.round((1 - PRICES.annual.amount / (PRICES.monthly.amount * 12)) * 100);
+  const [storePrices, setStorePrices] = useState<Partial<Record<StorePlan, string>>>({});
+  useEffect(() => {
+    if (!isNative) return;
+    void loadProducts().then((ps) => setStorePrices(Object.fromEntries(ps.map((p) => [p.plan, p.price]))));
+  }, []);
+  const priceOf = (p: StorePlan) => storePrices[p] ?? PRICES[p].label;
 
   const restore = async () => {
     const e = await activateToken(key);
@@ -158,7 +175,7 @@ export function Plans() {
           <p className="muted" style={{ maxWidth: '50ch' }}>
             {mine && !hasPrediction
               ? 'Predictions start the day you log your period. Everything you entered is saved on this device.'
-              : 'Everything is included in both plans. Cancel anytime from your app store or billing account; access continues until the end of the period you paid for.'}
+              : 'Everything is included in both plans. Cancel any time; access continues until the end of the period you paid for.'}
           </p>
         </div>
 
@@ -178,9 +195,9 @@ export function Plans() {
           {(['annual', 'monthly'] as const).map((p) => (
             <button key={p} type="button" className={`card plan stack ${plan === p ? 'selected' : ''}`} style={{ '--gap': '8px', textAlign: 'left', cursor: 'pointer' } as React.CSSProperties} onClick={() => setPlan(p)} aria-pressed={plan === p}>
               <div className="row between"><span className="eyebrow">{p === 'annual' ? 'Yearly' : 'Monthly'}</span>{p === 'annual' && <span className="badge established">Save {saving}% vs monthly</span>}</div>
-              <span className="price">{PRICES[p].label}</span>
-              <span className="small muted">{PRICES[p].per}{p === 'annual' ? ` · about $${(PRICES.annual.amount / 12).toFixed(2)} a month` : ''}</span>
-              <span className="tiny faint">Renews automatically at {PRICES[p].label} {PRICES[p].per} until you cancel.</span>
+              <span className="price">{priceOf(p)}</span>
+              <span className="small muted">{PRICES[p].per}{p === 'annual' && !storePrices.annual ? ` · about $${(PRICES.annual.amount / 12).toFixed(2)} a month` : ''}</span>
+              <span className="tiny faint">Renews automatically at {priceOf(p)} {PRICES[p].per} until you cancel.</span>
             </button>
           ))}
         </div>
@@ -199,16 +216,18 @@ export function Plans() {
 
         {active ? (
           <div className="card tint-sage stack" style={{ '--gap': '10px' } as React.CSSProperties}>
-            <strong>Your membership is active{entitlement.status === 'active' ? ` until ${formatLong(new Date(entitlement.expires * 1000).toISOString().slice(0, 10))}` : ''}.</strong>
+            <strong>Your membership is active.</strong>
             <button className="btn" onClick={() => navigate(data ? '/app' : '/start')}>{data ? 'Open Ondessa' : 'Set up Ondessa'}</button>
           </div>
+        ) : isNative ? (
+          <NativeCheckout plan={plan} price={priceOf(plan)} onDone={() => navigate(data ? '/app' : '/start')} />
         ) : (
           <div className="stack" style={{ '--gap': '12px' } as React.CSSProperties}>
-            <button className="btn block" disabled title="Checkout is connected in Phase 6">
+            <button className="btn block" disabled title="Web checkout is not connected yet">
               Continue with {plan === 'annual' ? 'yearly' : 'monthly'} · {PRICES[plan].label}
             </button>
-            <p className="small muted center">Cancel anytime. Full refund within 14 days of a web purchase.</p>
-            <p className="tiny faint center">Checkout is not live in this build. Payment is handled by the app store or a PCI-compliant processor; Ondessa never sees your card or health data together.</p>
+            <p className="small muted center">Cancel anytime.</p>
+            <p className="tiny faint center">Web checkout is not live yet. Ondessa never sees your card or your health data.</p>
             {previewPassAvailable && (
               <button className="btn secondary block" onClick={() => { usePreviewPass(); navigate(data ? '/app' : '/start'); }}>
                 Use a 14-day preview pass (development build only)
@@ -217,26 +236,71 @@ export function Plans() {
           </div>
         )}
 
-        {!mine && (
+        {!mine && !isNative && (
           <button className="btn ghost" style={{ alignSelf: 'center' }} onClick={() => { startTour(); navigate('/app'); }}>Not sure yet? Take the 2-minute tour</button>
         )}
 
-        <details className="card flat">
-          <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Restore a purchase with your membership key</summary>
-          <div className="stack" style={{ '--gap': '10px', marginTop: 12 } as React.CSSProperties}>
-            <p className="small muted">Your key proves your subscription without an account. It contains a random ID, your plan and an expiry date. Nothing else.</p>
-            <textarea className="input" value={key} onChange={(e) => setKey(e.target.value)} aria-label="Membership key" spellCheck={false} autoComplete="off" />
-            <button className="btn secondary" onClick={restore} disabled={!key.trim()}>Verify key</button>
-            {keyMsg && <p className="small" role="status">{keyMsg}</p>}
-          </div>
-        </details>
+        {!isNative && (
+          <details className="card flat">
+            <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Restore a purchase with your membership key</summary>
+            <div className="stack" style={{ '--gap': '10px', marginTop: 12 } as React.CSSProperties}>
+              <p className="small muted">Your key proves your subscription without an account. It contains a random ID, your plan and an expiry date. Nothing else.</p>
+              <textarea className="input" value={key} onChange={(e) => setKey(e.target.value)} aria-label="Membership key" spellCheck={false} autoComplete="off" />
+              <button className="btn secondary" onClick={restore} disabled={!key.trim()}>Verify key</button>
+              {keyMsg && <p className="small" role="status">{keyMsg}</p>}
+            </div>
+          </details>
+        )}
 
         <div className="small muted stack" style={{ '--gap': '6px' } as React.CSSProperties}>
-          <p><strong>Refunds.</strong> Purchases through Apple or Google follow their refund processes. Web purchases can be refunded within 14 days by contacting support. Final policy pending legal review.</p>
-          <p><strong>No double charges.</strong> If you already have an active membership, checkout will send you to restore it instead of charging again.</p>
+          {isNative ? (
+            <p>
+              Payment is charged to your {platform === 'android' ? 'Google Play' : 'Apple ID'} account when you confirm. The subscription renews automatically at the same price unless you cancel at least 24 hours before the end of the current period. Manage or cancel any time in your {platform === 'android' ? 'Google Play' : 'Apple ID'} settings.
+            </p>
+          ) : (
+            <p><strong>No double charges.</strong> If you already have an active membership, checkout sends you to restore it instead of charging again.</p>
+          )}
+          <p className="row wrap-row" style={{ '--gap': '16px' } as React.CSSProperties}>
+            <Link to="/legal">Terms of Use</Link>
+            <Link to="/privacy">Privacy Policy</Link>
+          </p>
         </div>
       </div>
     </PublicShell>
+  );
+}
+
+/** App Store / Google Play checkout with restore. Prices come from the store, localised. */
+function NativeCheckout({ plan, price, onDone }: { plan: StorePlan; price: string; onDone: () => void }) {
+  const { refreshEntitlement } = useStore();
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string>();
+  const buy = async () => {
+    setBusy(true);
+    setMsg(undefined);
+    const r = await purchase(plan);
+    await refreshEntitlement();
+    setBusy(false);
+    if (r === 'purchased') onDone();
+    else if (r === 'unavailable') setMsg('Purchases aren’t available right now. Check your connection and try again.');
+    else if (r === 'error') setMsg('The purchase didn’t go through. You have not been charged.');
+  };
+  const restore = async () => {
+    setBusy(true);
+    const owned = await restorePurchases();
+    await refreshEntitlement();
+    setBusy(false);
+    if (owned) onDone();
+    else setMsg('No active membership was found for this account.');
+  };
+  return (
+    <div className="stack" style={{ '--gap': '12px' } as React.CSSProperties}>
+      <button className="btn block" disabled={busy} onClick={buy}>
+        {busy ? 'One moment…' : `Subscribe ${plan === 'annual' ? 'yearly' : 'monthly'} · ${price}`}
+      </button>
+      <button className="btn secondary block" disabled={busy} onClick={restore}>Restore purchases</button>
+      {msg && <p className="small center" role="status">{msg}</p>}
+    </div>
   );
 }
 
@@ -311,7 +375,7 @@ export function ArticleView({ slug }: { slug: string }) {
         <h2 style={{ fontSize: '1.1rem' }}>Sources</h2>
         <ol className="small">
           {a.sources.map((s) => (
-            <li key={s.url}><a href={s.url} target="_blank" rel="noopener noreferrer">{s.label}</a></li>
+            <li key={s.url}><a href={s.url} target="_blank" rel="noopener noreferrer" onClick={(e) => { if (isNative) { e.preventDefault(); void openExternal(s.url); } }}>{s.label}</a></li>
           ))}
         </ol>
         <p className="tiny faint">Drafted {formatLong(a.drafted)}. Opening a source leaves Ondessa; no personal data is sent with the link.</p>
@@ -351,13 +415,13 @@ export function Legal() {
 }
 
 const FAQ: [string, string][] = [
-  ['Do I need an account?', 'No. Ondessa works without an account, email or phone number. Your membership is proven by a signed key stored on your device.'],
-  ['Where is my data?', 'In your browser’s storage on this device. It is not uploaded. If you turn on a passcode, it is encrypted with a key derived from that passcode.'],
+  ['Do I need an account?', 'No. Ondessa works without an account, email or phone number. Your membership is linked to your purchase, not to you.'],
+  ['Where is my data?', 'On this device only. It is not uploaded anywhere. If you turn on a passcode, it is encrypted with a key derived from that passcode.'],
   ['What if I lose my phone?', 'Without a backup, your data cannot be recovered, by you or by us. Create an encrypted backup from the Privacy center and keep it somewhere safe.'],
   ['What if I forget my passcode?', 'Encrypted data cannot be unlocked without it. You can erase the app and restore from a backup.'],
   ['Why does my prediction say “limited data”?', 'Predictions become more personal after 3 complete cycles and reach “established” after 6 consistent cycles. Until then, Ondessa leans on the cycle length you entered.'],
   ['Can I use Ondessa as birth control?', 'No. Ondessa is not a contraceptive and its fertile-window estimates must not be used to avoid pregnancy.'],
-  ['How do I cancel?', 'Through the store or billing account you subscribed with. Cancelling keeps access until the end of the paid period and does not delete your data.'],
+  ['How do I cancel?', 'More → Membership → Manage subscription. Cancelling keeps access until the end of the paid period and does not delete your data.'],
   ['How do I delete everything?', 'Privacy center → Delete everything. It removes all Ondessa data from this device and verifies the deletion.'],
 ];
 
@@ -491,9 +555,9 @@ function Audiences() {
             <Link to="/privacy" className="btn on-plum">How it works</Link>
           </div>
         </div>
-        <div className="chapter-visual" aria-label="Sample: what leaves your phone" role="img">
+        <div className="chapter-visual" aria-label="What Ondessa ever receives: none of your health data" role="img">
           <div className="ledger">
-            <div className="ledger-head"><span className="eyebrow">What leaves your phone</span><Icon name="lock" size={18} /></div>
+            <div className="ledger-head"><span className="eyebrow">What Ondessa ever receives</span><Icon name="lock" size={18} /></div>
             {[
               ['Period dates', 'Never'],
               ['Symptoms & notes', 'Never'],

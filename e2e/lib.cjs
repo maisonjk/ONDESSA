@@ -29,6 +29,10 @@ function diffDays(a, b) {
 function todayIn(timeZone, at = new Date()) {
   return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(at);
 }
+/** Today in the zone the browser contexts use by default (the machine's zone). */
+function today() {
+  return todayIn(Intl.DateTimeFormat().resolvedOptions().timeZone);
+}
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const MON = MONTHS.map((m) => m.slice(0, 3));
 function formatLong(date) {
@@ -127,7 +131,14 @@ async function open(opts = {}) {
     await page.clock.install({ time: opts.clock });
   }
   page.mon = mon;
+  opened.push({ ctx, mon, allowConsoleErrors: !!opts.allowConsoleErrors });
   return { ctx, page, mon };
+}
+
+/** Every context opened since the last drain, so the runner can check and close them. */
+const opened = [];
+function drainOpened() {
+  return opened.splice(0, opened.length);
 }
 
 async function goto(page, route = '/') {
@@ -159,7 +170,8 @@ async function seed(page, data, { entitled = true, route = '/app' } = {}) {
     });
     if (entitled) localStorage.setItem('ondessa.entitlement', `preview:${Math.floor(Date.now() / 1000) + 14 * 86400}`);
   }, { data, entitled });
-  await page.goto(`${BASE}/#${route}`);
+  // Replace the hash without firing hashchange (the running app would redirect), then reload.
+  await page.evaluate((r) => history.replaceState(null, '', `#${r}`), route);
   await page.reload();
   await page.waitForFunction(() => !document.querySelector('[aria-busy="true"]') && document.querySelector('#root')?.childElementCount > 0);
 }
@@ -290,7 +302,7 @@ async function smallTargets(page, min = 44) {
 }
 
 module.exports = {
-  pw, BASE, iso, addDays, diffDays, todayIn, formatLong, formatShort, emptyData, addPeriod, cycleHistory,
-  getBrowser, closeBrowser, open, goto, hashGo, seed, readVault, idbNames, storageKeys, settle, onboard, setStepper,
+  pw, BASE, iso, addDays, diffDays, todayIn, today, formatLong, formatShort, emptyData, addPeriod, cycleHistory,
+  getBrowser, closeBrowser, open, drainOpened, goto, hashGo, seed, readVault, idbNames, storageKeys, settle, onboard, setStepper,
   noHorizontalScroll, axe, smallTargets,
 };

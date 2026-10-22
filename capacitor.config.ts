@@ -12,7 +12,6 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   ios: {
     contentInset: 'never',
-    limitsNavigationsToAppBoundDomains: true,
   },
   android: {
     allowMixedContent: false,
