@@ -269,6 +269,9 @@ export const ARTICLES: Article[] = [
   },
 ];
 
+/** Review status of the week-by-week notes below, shown in the app and enforced by release:check. */
+export const PREGNANCY_WEEKS_REVIEW: Article['review'] = AWAITING;
+
 /** Week-by-week pregnancy notes, grouped. Awaiting clinical review (see header). */
 export const PREGNANCY_WEEKS: { from: number; to: number; title: string; baby: string; you: string }[] = [
   { from: 0, to: 3, title: 'Before a positive test', baby: 'Pregnancy is counted from the first day of your last period, so the first two weeks happen before conception.', you: 'Many people do not know they are pregnant yet. Health services often recommend folic acid before and in early pregnancy.' },

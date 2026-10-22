@@ -13,6 +13,8 @@ npm test               # 60 unit tests
 npm run test:tz        # same suite in 4 time zones (DST and half-hour DST)
 npm run build          # production build with strict CSP in dist/
 npm run licenses       # OSS license inventory
+npm run release:check  # fails while anything would block an App Store / Play submission
+npm run build:native   # build and sync the iOS and Android projects (open with npx cap open ios|android)
 ```
 
 A production build hides the preview pass. To deploy a reviewable preview, build with `VITE_PREVIEW_PASS=true`. Set `VITE_ENTITLEMENT_PUBLIC_JWK` to the entitlement server's public key once Phase 6 ships.
@@ -40,6 +42,7 @@ public/        PWA manifest, icon, service worker, security headers
 6. [Prediction engine](docs/06-prediction-engine.md)
 7. [Development checklist and phase report](docs/07-development-checklist.md)
 8. [Editorial policy](docs/08-editorial-policy.md)
+9. [App Store & Google Play readiness](docs/09-app-store-readiness.md) · legal drafts in [docs/legal/](docs/legal/)
 
 ## Not medical advice
 

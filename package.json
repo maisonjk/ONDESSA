@@ -11,7 +11,9 @@
     "typecheck": "tsc --noEmit -p .",
     "test": "vitest run",
     "test:tz": "TZ=UTC vitest run && TZ=America/Los_Angeles vitest run && TZ=Pacific/Auckland vitest run && TZ=Australia/Lord_Howe vitest run",
-    "licenses": "node scripts/license-inventory.mjs"
+    "licenses": "node scripts/license-inventory.mjs",
+    "release:check": "node scripts/release-check.mjs",
+    "build:native": "vite build && cap sync"
   },
   "dependencies": {
     "@aparajita/capacitor-biometric-auth": "10.0.0",

@@ -83,7 +83,7 @@ async function main() {
       results.push({ id, status, bug: t.bug, error, ms });
       const tag = { PASS: 'PASS  ', FAIL: 'FAIL  ', KNOWN: 'KNOWN ', 'FIXED?': 'FIXED?' }[status];
       console.log(`${tag} ${id}${t.bug ? `  [${t.bug}]` : ''}  (${ms} ms)`);
-      if (error && (status === 'FAIL' || process.env.VERBOSE)) console.log(`       ${String(error.stack || error).split('\n').slice(0, 4).join('\n       ')}`);
+      if (error && (status === 'FAIL' || process.env.VERBOSE)) console.log(`       ${String(error.stack || error).split("\n").slice(0, 12).join('\n       ')}`);
     }
   }
   await L.closeBrowser();

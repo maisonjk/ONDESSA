@@ -226,8 +226,8 @@ async function onboard(page, opts = {}) {
   } else {
     if (opts.unsure) await page.getByLabel('I’m not sure. I’ll log my next period.').check();
     else if (opts.lastStart) await page.fill('#last', opts.lastStart);
-    if (opts.cycleLen) await setStepper(page, 'Usual cycle length', 28, opts.cycleLen);
-    if (opts.periodLen) await setStepper(page, 'Usual period length', 5, opts.periodLen);
+    if (opts.cycleLen !== undefined) await setStepper(page, 'Usual cycle length', 28, opts.cycleLen);
+    if (opts.periodLen !== undefined) await setStepper(page, 'Usual period length', 5, opts.periodLen);
   }
   await page.getByRole('button', { name: 'Continue' }).click();
   if (opts.pin) {

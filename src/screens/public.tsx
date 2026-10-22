@@ -3,6 +3,7 @@ import { Link, navigate } from '../app/router';
 import { useStore } from '../app/store';
 import { ARTICLES, CATEGORIES, type Article } from '../content/library';
 import type { Goal } from '../engine';
+import { COMPANY } from '../content/company';
 import { activateToken, previewPassAvailable } from '../data/entitlement';
 import { isNative, openExternal, platform } from '../platform';
 import { loadProducts, purchase, restorePurchases, type StorePlan } from '../platform/purchases';
@@ -439,7 +440,13 @@ export function Help() {
             </details>
           ))}
         </div>
-        <div className="callout sage">Support emails go to a separate inbox. Please do not include health details; we never need them to help with your account.</div>
+        {COMPANY.supportEmail && (
+          <div className="card stack" style={{ '--gap': '6px' } as React.CSSProperties}>
+            <h3>Contact support</h3>
+            <p className="small muted">Email us at <strong style={{ userSelect: 'all' }}>{COMPANY.supportEmail}</strong></p>
+          </div>
+        )}
+        <div className="callout sage">Please do not include health details when you contact support. We never need them to help with your membership or the app.</div>
       </div>
     </PublicShell>
   );

@@ -6,7 +6,7 @@ import { notificationPermission, requestNotificationPermission } from '../platfo
 import { manageSubscription, restorePurchases } from '../platform/purchases';
 import { Link, navigate } from '../app/router';
 import { useStore } from '../app/store';
-import { weekNotes } from '../content/library';
+import { PREGNANCY_WEEKS_REVIEW, weekNotes } from '../content/library';
 import { BackupNeedsPassword, makeBackup, readBackup } from '../data/backup';
 import { WrongPassphraseError } from '../data/crypto';
 import {
@@ -188,7 +188,9 @@ export function PregnancyView() {
 
       {notes && (
         <section className="card stack" style={{ '--gap': '10px' } as React.CSSProperties}>
-          <div className="row between wrap-row"><h3>{notes.title}</h3><span className="badge limited">Draft · awaiting clinical review</span></div>
+          <div className="row between wrap-row"><h3>{notes.title}</h3>{PREGNANCY_WEEKS_REVIEW.status === 'reviewed'
+            ? <span className="badge developing">Reviewed by {PREGNANCY_WEEKS_REVIEW.reviewer}, {PREGNANCY_WEEKS_REVIEW.credentials}</span>
+            : <span className="badge limited">Draft · awaiting clinical review</span>}</div>
           <p className="small"><strong>Baby:</strong> {notes.baby}</p>
           <p className="small"><strong>You:</strong> {notes.you}</p>
           <p className="tiny faint">General information for weeks {notes.from}–{notes.to}. Every pregnancy is different.</p>
