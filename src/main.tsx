@@ -15,6 +15,8 @@ createRoot(document.getElementById('root')!).render(
 // Offline support. The service worker caches only the app's own static files.
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
-    void navigator.serviceWorker.register('/sw.js');
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      /* not available in this context; the app still works online */
+    });
   });
 }

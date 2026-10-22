@@ -29,7 +29,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --ivory: #1a1219;
     --paper: #241a23;
     --paper-2: #2e222d;
@@ -50,6 +50,28 @@
     color-scheme: dark;
   }
 }
+
+/* An explicit theme choice on the root element wins over the OS setting. */
+:root[data-theme="dark"] {
+  --ivory: #1a1219;
+  --paper: #241a23;
+  --paper-2: #2e222d;
+  --ink: #f4ece6;
+  --ink-2: #cdbfc8;
+  --ink-3: #9a8b96;
+  --line: #3b2d39;
+  --plum: #d9b6d0;
+  --plum-2: #c79bbd;
+  --berry: #e08aab;
+  --berry-ink: #f0a9c3;
+  --berry-soft: #3f2232;
+  --sage: #9cbb9f;
+  --sage-ink: #b5d0b7;
+  --sage-soft: #24302a;
+  --on-plum: #241a23;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -12px rgb(0 0 0 / 0.6);
+  color-scheme: dark;
+  }
 
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
