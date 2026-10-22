@@ -14,9 +14,9 @@ const GOALS: { id: Goal; icon: string; title: string; detail: string }[] = [
 ];
 
 export function Onboarding() {
-  const { today, begin, entitlement } = useStore();
+  const { today, begin, entitlement, startIntent } = useStore();
   const [step, setStep] = useState(0);
-  const [goal, setGoal] = useState<Goal>('understand');
+  const [goal, setGoal] = useState<Goal>(startIntent ?? 'understand');
   const [lastStart, setLastStart] = useState('');
   const [unsure, setUnsure] = useState(false);
   const [cycleLen, setCycleLen] = useState(28);

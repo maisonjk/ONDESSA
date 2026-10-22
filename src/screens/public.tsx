@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, navigate } from '../app/router';
 import { useStore } from '../app/store';
 import { ARTICLES, CATEGORIES, type Article } from '../content/library';
+import type { Goal } from '../engine';
 import { activateToken, previewPassAvailable } from '../data/entitlement';
 import { diffDays, forecast, formatLong, formatShort, localToday, phaseOn, PHASE_COPY } from '../engine';
 import { tourData } from '../app/tour';
@@ -72,6 +73,8 @@ export function Landing() {
           </div>
         </section>
 
+        <Audiences />
+
         <section>
           <div className="wrap stack" style={{ '--gap': '28px' } as React.CSSProperties}>
             <h2 style={{ maxWidth: '18ch' }}>Not another period calendar.</h2>
@@ -110,21 +113,6 @@ export function Landing() {
                 <span className="small muted">{d}</span>
               </div>
             ))}
-          </div>
-        </section>
-
-        <section className="dark-band">
-          <div className="wrap stack" style={{ '--gap': '18px', maxWidth: 760 } as React.CSSProperties}>
-            <span className="eyebrow">Our privacy architecture</span>
-            <h2>We built it so we <em>can’t</em> see your cycle.</h2>
-            <ul className="stack" style={{ '--gap': '10px', paddingLeft: 20 } as React.CSSProperties}>
-              <li>Your logs, predictions and notes are stored and calculated on your device.</li>
-              <li>No advertising or analytics SDKs, and no AI service ever receives your health records.</li>
-              <li>Your subscription is checked with a signed key that contains no health information.</li>
-              <li>Notifications can use discreet wording that never mentions periods, fertility or pregnancy.</li>
-            </ul>
-            <p className="small" style={{ opacity: 0.8 }}>The trade-off: if you lose your device without a backup, we cannot restore your data. Ondessa makes encrypted backups easy.</p>
-            <div><Link to="/privacy" className="btn on-plum">Read the details</Link></div>
           </div>
         </section>
 
@@ -456,5 +444,150 @@ function LivePreview() {
         <DotRing f={f} showFertility size={260} />
       </div>
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ Audience chapters */
+
+type Chapter = 'privacy' | 'conceive' | 'changing';
+
+const CHAPTERS: { id: Chapter; chip: string }[] = [
+  { id: 'privacy', chip: 'I want my data private' },
+  { id: 'conceive', chip: 'We’re trying for a baby' },
+  { id: 'changing', chip: 'My cycles are changing' },
+];
+
+function Audiences() {
+  const { setStartIntent } = useStore();
+  const start = (goal: Goal) => {
+    setStartIntent(goal);
+    navigate('/start');
+  };
+  const jump = (id: Chapter) => document.getElementById(`ch-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  return (
+    <section className="wrap stack" style={{ '--gap': '28px' } as React.CSSProperties} aria-labelledby="audiences-title">
+      <div className="stack" style={{ '--gap': '14px' } as React.CSSProperties}>
+        <span className="eyebrow">Made for where you are</span>
+        <h2 id="audiences-title">Which one <em>sounds like you?</em></h2>
+        <div className="chips">
+          {CHAPTERS.map((c) => <button key={c.id} type="button" className={`chip audience-chip chip-${c.id}`} onClick={() => jump(c.id)}>{c.chip}</button>)}
+        </div>
+      </div>
+
+      <article id="ch-privacy" className="chapter chapter-dark">
+        <div className="chapter-copy">
+          <span className="eyebrow">Privacy first</span>
+          <h3 className="chapter-title">Your cycle is nobody’s business. <em>Not even ours.</em></h3>
+          <p className="chapter-lede">Many period apps keep your cycle on their servers. Ondessa keeps it on your phone, so there is nothing for anyone to sell, leak or hand over.</p>
+          <ul className="gets">
+            <li><b>No account.</b> No email, name or phone number. Ever.</li>
+            <li><b>Lock and encrypt</b> everything with a passcode.</li>
+            <li><b>Notifications that never say “period”</b>, so nothing shows on your lock screen.</li>
+            <li><b>Delete everything in one tap</b>, and see the deletion verified.</li>
+          </ul>
+          <div className="row wrap-row">
+            <button className="btn chapter-cta" onClick={() => start('understand')}>Start privately</button>
+            <Link to="/privacy" className="btn on-plum">How it works</Link>
+          </div>
+        </div>
+        <div className="chapter-visual" aria-label="Sample: what leaves your phone" role="img">
+          <div className="ledger">
+            <div className="ledger-head"><span className="eyebrow">What leaves your phone</span><Icon name="lock" size={18} /></div>
+            {[
+              ['Period dates', 'Never'],
+              ['Symptoms & notes', 'Never'],
+              ['Fertility & pregnancy', 'Never'],
+              ['Name, email, phone', 'Not collected'],
+              ['Ads & trackers', 'None'],
+            ].map(([k, v]) => (
+              <div key={k} className="ledger-row"><span>{k}</span><span className="ledger-val">{v}</span></div>
+            ))}
+          </div>
+          <div className="notif">
+            <span className="notif-icon"><Mark size={22} /></span>
+            <span><b>Ondessa</b><span>You have a gentle check-in from Ondessa.</span></span>
+            <span className="notif-time mono">now</span>
+          </div>
+        </div>
+      </article>
+
+      <article id="ch-conceive" className="chapter phase-fertile">
+        <div className="chapter-copy">
+          <span className="eyebrow">Trying to conceive</span>
+          <h3 className="chapter-title">Your best days, <em>and how sure we are.</em></h3>
+          <p className="chapter-lede">Calendar apps hand you one confident date. Ondessa shows your most likely fertile days, the full possible range, and sharpens the estimate when you log a positive LH test or a temperature rise.</p>
+          <ul className="gets">
+            <li><b>Most likely and possible days</b>, shown side by side.</li>
+            <li><b>LH tests, temperature and mucus</b> refine the estimate.</li>
+            <li><b>A test-day reminder</b> on the day a home test is most reliable.</li>
+            <li><b>No false promises.</b> It can’t confirm ovulation or pregnancy, and it says so.</li>
+          </ul>
+          <button className="btn chapter-cta" onClick={() => start('conceive')}>Start for trying to conceive</button>
+        </div>
+        <div className="chapter-visual" aria-label="Sample: fertile window with most likely and possible days" role="img">
+          <div className="mini-card">
+            <div className="row between wrap-row" style={{ '--gap': '8px' } as React.CSSProperties}>
+              <span className="eyebrow">This cycle · sample</span>
+              <ConfidenceBadge level="developing" />
+            </div>
+            <div className="kicker-num" style={{ fontSize: '3rem' }}>Oct 21–27</div>
+            <span className="small muted">Most likely fertile days</span>
+            <div className="strip" aria-hidden="true">
+              {Array.from({ length: 29 }, (_, i) => {
+                // Sample cycle starting Oct 11: most likely days 11–17 (Oct 21–27), ovulation day 16, today day 15.
+                const d = i + 1;
+                const k = d <= 5 ? 'p' : d === 16 ? 'o' : d >= 11 && d <= 17 ? 'f' : d >= 8 && d <= 20 ? 'w' : 'n';
+                return <i key={d} className={`s-${k}${d === 15 ? ' s-today' : ''}`} />;
+              })}
+            </div>
+            <div className="legend">
+              <span><i style={{ background: 'var(--berry)' }} />Period</span>
+              <span><i style={{ background: 'var(--sage)' }} />Most likely</span>
+              <span><i style={{ background: 'var(--sage-soft)', boxShadow: 'inset 0 0 0 1px var(--sage)' }} />Possible</span>
+              <span><i style={{ background: 'var(--sage-ink)' }} />Est. ovulation</span>
+            </div>
+          </div>
+          <div className="event-pill">
+            <span className="ev-dot" />
+            <span><b>Positive LH test logged Oct 25.</b> Ovulation estimate moved to Oct 26.</span>
+          </div>
+        </div>
+      </article>
+
+      <article id="ch-changing" className="chapter phase-luteal">
+        <div className="chapter-copy">
+          <span className="eyebrow">Changing cycles & perimenopause</span>
+          <h3 className="chapter-title">For cycles that <em>don’t follow the textbook.</em></h3>
+          <p className="chapter-lede">When your cycle swings from 26 to 52 days, a single predicted date is fiction. Ondessa widens the window, tells you why, and helps you see what is actually changing.</p>
+          <ul className="gets">
+            <li><b>Honest, wider windows</b> when your cycles vary.</li>
+            <li><b>Track hot flushes, night sweats and sleep</b> alongside your cycle.</li>
+            <li><b>Patterns from your own logs</b>, never generic advice.</li>
+            <li><b>Your full history</b>, exportable any time.</li>
+          </ul>
+          <button className="btn chapter-cta" onClick={() => start('perimenopause')}>Start for changing cycles</button>
+        </div>
+        <div className="chapter-visual" aria-label="Sample: irregular cycle lengths and a wider prediction window" role="img">
+          <div className="mini-card">
+            <span className="eyebrow">Last 6 cycles · sample</span>
+            <div className="mini-bars" aria-hidden="true">
+              {[27, 34, 26, 45, 31, 52].map((n, i) => (
+                <div key={i}><b className="mono">{n}</b><span style={{ height: `${(n / 52) * 96}px` }} /></div>
+              ))}
+            </div>
+            <div className="row between wrap-row" style={{ '--gap': '8px' } as React.CSSProperties}>
+              <span className="small"><b>Next period:</b> Nov 3 – Nov 17</span>
+              <span className="badge">Wider window</span>
+            </div>
+            <span className="tiny muted">Your cycles vary by 26 days, so the window is wider.</span>
+          </div>
+          <div className="event-pill">
+            <span className="ev-dot" />
+            <span><b>Your pattern:</b> night sweats logged in the week before 3 of your last 4 periods.</span>
+          </div>
+        </div>
+      </article>
+    </section>
   );
 }

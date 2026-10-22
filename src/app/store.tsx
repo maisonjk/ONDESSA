@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   findPatterns, forecast, localToday, sanitizeLog,
-  type AppData, type DayLog, type Forecast, type Insight, type ISODate,
+  type AppData, type DayLog, type Forecast, type Goal, type Insight, type ISODate,
 } from '../engine';
 import { WrongPassphraseError } from '../data/crypto';
 import {
@@ -38,6 +38,9 @@ interface Store {
   storageError?: string;
   notice?: string;
   notify(msg: string): void;
+  /** Goal chosen on the landing page, used to preselect setup. Memory only. */
+  startIntent?: Goal;
+  setStartIntent(g: Goal | undefined): void;
 }
 
 const Ctx = createContext<Store | null>(null);
@@ -61,6 +64,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const saveTimer = useRef<number | undefined>(undefined);
   const realData = useRef<AppData | undefined>(undefined);
   const [notice, notify] = useToast();
+  const [startIntent, setStartIntent] = useState<Goal>();
 
   // Keep "today" correct across midnight without reloading.
   useEffect(() => {
@@ -209,7 +213,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     phase, today, tour, data, forecast: fc, insights, entitlement,
     locked: !!passcode.current || stored?.mode === 'locked',
     selectedDate, selectDate, update, setLog, begin, unlockWith, setPasscode, replaceData,
-    startTour, exitTour, refreshEntitlement, usePreviewPass, eraseAll, storageError, notice, notify,
+    startTour, exitTour, refreshEntitlement, usePreviewPass, eraseAll, storageError, notice, notify, startIntent, setStartIntent,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
