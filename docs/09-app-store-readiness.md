@@ -56,6 +56,10 @@ npx cap open android          # Android Studio
 2. Build an App Bundle (.aab).
 3. Upload it to an internal or closed test track.
 
+## Testing purchases from Xcode
+
+`ios/App/App/Ondessa.storekit` holds both subscriptions (yearly $59.99, monthly $8.99, 1-week free trial). In Xcode choose Product → Scheme → Edit Scheme → Run → Options → StoreKit Configuration → `Ondessa.storekit`. Purchases then run locally with no App Store Connect setup or charge; manage them under Debug → StoreKit → Manage Transactions. Set the scheme back to None to test against App Store Connect sandbox products.
+
 ## Device test plan (before every submission)
 
 | Area | Test |
