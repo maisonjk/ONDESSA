@@ -9,7 +9,7 @@ A private, paid cycle, fertility and pregnancy companion. Local-first: health da
 ```bash
 npm install
 npm run dev            # http://localhost:5173 (preview pass available in dev)
-npm test               # 54 unit tests
+npm test               # 60 unit tests
 npm run test:tz        # same suite in 4 time zones (DST and half-hour DST)
 npm run build          # production build with strict CSP in dist/
 npm run licenses       # OSS license inventory

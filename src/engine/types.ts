@@ -87,6 +87,8 @@ export interface AppData {
   /** Kept after pregnancy mode ends so history is not lost. */
   pastPregnancies: Pregnancy[];
   appointments: Appointment[];
+  /** Date of the last backup the user exported, for gentle backup reminders. */
+  lastBackupOn?: ISODate;
 }
 
 export function defaultSettings(): Settings {

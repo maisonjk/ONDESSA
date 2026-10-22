@@ -123,6 +123,7 @@ export function sanitizeData(raw: unknown): AppData {
       ? raw.appointments.map(sanitizeAppointment).filter((a): a is Appointment => !!a)
       : [],
   };
+  if (isISODate(raw.lastBackupOn)) data.lastBackupOn = raw.lastBackupOn;
   const pregnancy = sanitizePregnancy(raw.pregnancy);
   if (pregnancy) data.pregnancy = pregnancy;
   if (!data.settings.intercourseLogging) {

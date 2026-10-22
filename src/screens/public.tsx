@@ -3,8 +3,9 @@ import { Link, navigate } from '../app/router';
 import { useStore } from '../app/store';
 import { ARTICLES, CATEGORIES, type Article } from '../content/library';
 import { activateToken, previewPassAvailable } from '../data/entitlement';
-import { formatLong } from '../engine';
-import { ConfidenceBadge, Icon, Mark, MedicalNote, Segmented } from '../ui/components';
+import { diffDays, forecast, formatLong, formatShort, localToday, phaseOn, PHASE_COPY } from '../engine';
+import { tourData } from '../app/tour';
+import { ConfidenceBadge, DotRing, Icon, Mark, MedicalNote, PhasePill } from '../ui/components';
 
 export const PRICES = {
   monthly: { amount: 8.99, label: '$8.99', per: 'per month' },
@@ -12,8 +13,9 @@ export const PRICES = {
 } as const;
 
 export function PublicShell({ children }: { children: React.ReactNode }) {
-  const { data, entitlement } = useStore();
-  const inApp = data && entitlement.status === 'active';
+  const { data, entitlement, tour } = useStore();
+  const inApp = data && !tour && entitlement.status === 'active';
+  const setUp = data && !tour;
   return (
     <div>
       <header className="topbar">
@@ -22,7 +24,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
           <nav className="row" style={{ '--gap': '4px' } as React.CSSProperties}>
             <Link to="/library" className="btn ghost">Library</Link>
             <Link to="/plans" className="btn ghost">Pricing</Link>
-            <Link to={inApp ? '/app' : '/start'} className="btn" >{inApp ? 'Open' : 'Start'}</Link>
+            {inApp ? <Link to="/app" className="btn">Open</Link> : !setUp && <Link to="/start" className="btn">Start</Link>}
           </nav>
         </div>
       </header>
@@ -66,32 +68,21 @@ export function Landing() {
               </div>
               <p className="small faint">The tour uses sample data and saves nothing.</p>
             </div>
-            <div className="phone fade-in" aria-hidden="true">
-              <div className="stack" style={{ '--gap': '14px' } as React.CSSProperties}>
-                <div className="row between"><span className="eyebrow">Today</span><span className="tiny faint">Cycle day 18</span></div>
-                <div className="serif" style={{ fontSize: '1.7rem' }}>Period expected<br />Nov 3–5</div>
-                <ConfidenceBadge level="established" />
-                <div className="card tint-sage flat">
-                  <div className="eyebrow">Your pattern</div>
-                  <p className="small" style={{ marginTop: 6 }}>You logged headaches in the 5 days before your period in 4 of your last 6 cycles.</p>
-                </div>
-                <div className="card flat small muted">Based on the median of your last 6 cycles: 28 days.</div>
-              </div>
-            </div>
+            <LivePreview />
           </div>
         </section>
 
-        <section style={{ background: 'var(--paper)' }}>
+        <section>
           <div className="wrap stack" style={{ '--gap': '28px' } as React.CSSProperties}>
-            <h2 style={{ maxWidth: '22ch' }}>Not another period calendar.</h2>
+            <h2 style={{ maxWidth: '18ch' }}>Not another period calendar.</h2>
             <div className="pillars">
               {[
                 { icon: 'spark', t: 'My Cycle, My Patterns', d: 'Observations drawn only from your logs, with the evidence and limits written next to every one.' },
                 { icon: 'info', t: 'Predictions that show their work', d: 'Three honest confidence levels. Wider windows when your cycles vary. Never a fact when it is an estimate.' },
                 { icon: 'shield', t: 'Private by architecture', d: 'Your data lives on your device. Optional passcode encryption. Export or permanently delete in one tap.' },
               ].map((p) => (
-                <div key={p.t} className="card stack" style={{ '--gap': '10px' } as React.CSSProperties}>
-                  <span style={{ color: 'var(--berry)' }}><Icon name={p.icon} size={26} /></span>
+                <div key={p.t} className="card stack" style={{ '--gap': '10px', padding: 28 } as React.CSSProperties}>
+                  <span style={{ color: 'var(--ink)' }}><Icon name={p.icon} size={26} /></span>
                   <h3>{p.t}</h3>
                   <p className="muted small">{p.d}</p>
                 </div>
@@ -100,27 +91,31 @@ export function Landing() {
           </div>
         </section>
 
-        <section className="wrap">
-          <div className="grid-2" style={{ alignItems: 'center', gap: 40 }}>
-            <div className="stack" style={{ '--gap': '14px' } as React.CSSProperties}>
-              <span className="eyebrow">One app, every stage</span>
-              <h2>From first cycle to due date, and the changes after.</h2>
-              <p className="muted">Track your cycle, plan a pregnancy with optional LH, temperature and mucus logging, switch to a week-by-week pregnancy calendar, or follow perimenopause changes. You choose what to track. Nothing assumes you want children, are sexually active, or menstruate the same way every month.</p>
-            </div>
-            <div className="stack">
-              {['Cycle intelligence', 'Pregnancy planning', 'Pregnancy calendar', 'Life-stage insights'].map((x, i) => (
-                <div key={x} className="card flat row between">
-                  <span className="serif" style={{ fontSize: '1.15rem' }}>{x}</span>
-                  <span className="faint tiny">0{i + 1}</span>
-                </div>
-              ))}
-            </div>
+        <section className="wrap stack" style={{ '--gap': '24px' } as React.CSSProperties}>
+          <div className="stack" style={{ '--gap': '12px', maxWidth: 640 } as React.CSSProperties}>
+            <span className="eyebrow">Colour that means something</span>
+            <h2>Your cycle has four phases. Ondessa shows you where you are.</h2>
+            <p className="muted">The app takes on the colour of your current phase, estimated from your own history. Plan a pregnancy, follow a pregnancy week by week, or track changing cycles in perimenopause. You choose what to track, and nothing assumes you want children or have textbook cycles.</p>
+          </div>
+          <div className="phase-key">
+            {([
+              ['menstrual', 'Period', 'Logged by you. Day 1 starts each cycle.'],
+              ['follicular', 'Follicular', 'After your period, building towards ovulation.'],
+              ['fertile', 'Fertile window', 'Estimated. Never a confirmation of ovulation.'],
+              ['luteal', 'Luteal', 'Estimated. Where premenstrual patterns often show up.'],
+            ] as const).map(([ph, t, d]) => (
+              <div key={ph} className={`phase-${ph}`}>
+                <span style={{ width: 12, height: 12, borderRadius: 99, background: 'var(--phase)' }} />
+                <strong>{t}</strong>
+                <span className="small muted">{d}</span>
+              </div>
+            ))}
           </div>
         </section>
 
-        <section style={{ background: 'var(--plum)', color: 'var(--on-plum)' }}>
+        <section className="dark-band">
           <div className="wrap stack" style={{ '--gap': '18px', maxWidth: 760 } as React.CSSProperties}>
-            <span className="eyebrow" style={{ color: 'inherit', opacity: 0.7 }}>Our privacy architecture</span>
+            <span className="eyebrow">Our privacy architecture</span>
             <h2>We built it so we can’t see your cycle.</h2>
             <ul className="stack" style={{ '--gap': '10px', paddingLeft: 20 } as React.CSSProperties}>
               <li>Your logs, predictions and notes are stored and calculated on your device.</li>
@@ -134,7 +129,7 @@ export function Landing() {
         </section>
 
         <section className="wrap center stack" style={{ '--gap': '14px', alignItems: 'center' } as React.CSSProperties}>
-          <h2>Simple pricing. No free tier, no ads, no selling data.</h2>
+          <h2 style={{ maxWidth: '20ch' }}>Simple pricing. No free tier, no ads, no selling data.</h2>
           <p className="muted" style={{ maxWidth: '52ch' }}>Your subscription is the whole business model. That’s what lets us say no to the rest.</p>
           <div className="row wrap-row" style={{ justifyContent: 'center' }}>
             <span className="serif" style={{ fontSize: '1.4rem' }}>$8.99 / month</span>
@@ -149,7 +144,9 @@ export function Landing() {
 }
 
 export function Plans() {
-  const { data, entitlement, refreshEntitlement, usePreviewPass } = useStore();
+  const { data, entitlement, refreshEntitlement, usePreviewPass, forecast: f, tour, startTour } = useStore();
+  const mine = data && !tour ? f : undefined;
+  const hasPrediction = !!mine?.nextPeriod;
   const [plan, setPlan] = useState<'annual' | 'monthly'>('annual');
   const [key, setKey] = useState('');
   const [keyMsg, setKeyMsg] = useState<string>();
@@ -167,10 +164,27 @@ export function Plans() {
       <div className="wrap main stack" style={{ '--gap': '28px', maxWidth: 820 } as React.CSSProperties}>
         <div className="stack center" style={{ '--gap': '10px', alignItems: 'center' } as React.CSSProperties}>
           <span className="eyebrow">Ondessa membership</span>
-          <h1 style={{ fontSize: 'clamp(2rem, 5vw, 2.8rem)' }}>{data ? 'Your first prediction is ready.' : 'Choose your plan'}</h1>
-          <p className="muted" style={{ maxWidth: '50ch' }}>Everything is included in both plans. Cancel anytime from your app store or billing account; access continues until the end of the period you paid for.</p>
-          <Segmented label="Billing period" value={plan} onChange={setPlan} options={[{ value: 'annual', label: 'Yearly' }, { value: 'monthly', label: 'Monthly' }]} />
+          <h1 style={{ fontSize: 'clamp(2rem, 5vw, 2.8rem)' }}>
+            {hasPrediction ? 'Your first prediction is ready.' : mine ? 'You’re set up.' : 'Choose your plan'}
+          </h1>
+          <p className="muted" style={{ maxWidth: '50ch' }}>
+            {mine && !hasPrediction
+              ? 'Predictions start the day you log your period. Everything you entered is saved on this device.'
+              : 'Everything is included in both plans. Cancel anytime from your app store or billing account; access continues until the end of the period you paid for.'}
+          </p>
         </div>
+
+        {hasPrediction && mine && (
+          <section className={`prediction-card phase-${phaseOn(mine, mine.today) ?? 'none'}`} aria-label="Your prediction">
+            <div className="stack" style={{ '--gap': '10px' } as React.CSSProperties}>
+              <span className="eyebrow">Next period · most likely</span>
+              <span className="kicker-num" style={{ fontSize: '2.8rem' }}>{formatShort(mine.nextPeriod!.expected)}</span>
+              <span className="small muted">Window {formatShort(mine.nextPeriod!.earliest)} to {formatShort(mine.nextPeriod!.latest)}. Gets more personal as you log: patterns unlock after 3 cycles.</span>
+              <ConfidenceBadge level={mine.confidence} />
+            </div>
+            <DotRing f={mine} showFertility={data!.settings.showFertility} size={200} />
+          </section>
+        )}
 
         <div className="price-grid">
           {(['annual', 'monthly'] as const).map((p) => (
@@ -205,6 +219,7 @@ export function Plans() {
             <button className="btn block" disabled title="Checkout is connected in Phase 6">
               Continue with {plan === 'annual' ? 'yearly' : 'monthly'} · {PRICES[plan].label}
             </button>
+            <p className="small muted center">Cancel anytime. Full refund within 14 days of a web purchase.</p>
             <p className="tiny faint center">Checkout is not live in this build. Payment is handled by the app store or a PCI-compliant processor; Ondessa never sees your card or health data together.</p>
             {previewPassAvailable && (
               <button className="btn secondary block" onClick={() => { usePreviewPass(); navigate(data ? '/app' : '/start'); }}>
@@ -212,6 +227,10 @@ export function Plans() {
               </button>
             )}
           </div>
+        )}
+
+        {!mine && (
+          <button className="btn ghost" style={{ alignSelf: 'center' }} onClick={() => { startTour(); navigate('/app'); }}>Not sure yet? Take the 2-minute tour</button>
         )}
 
         <details className="card flat">
@@ -413,5 +432,29 @@ export function Deleted({ verified }: { verified: boolean }) {
         </div>
       </div>
     </PublicShell>
+  );
+}
+
+/** A real, rendered Today hero driven by the tour's sample data. */
+function LivePreview() {
+  const today = localToday();
+  const data = tourData(today);
+  const f = forecast(data, today);
+  const phase = phaseOn(f, today);
+  const daysTo = f.nextPeriod ? diffDays(today, f.nextPeriod.expected) : 0;
+  return (
+    <div className="phone fade-in" aria-label="Preview of the Today screen with sample data" role="img">
+      <div className={`phase-hero phase-${phase ?? 'none'}`} style={{ gridTemplateColumns: '1fr', borderRadius: 28 }}>
+        <div className="stack" style={{ '--gap': '10px' } as React.CSSProperties}>
+          <PhasePill phase={phase}>{phase ? PHASE_COPY[phase].label : 'Cycle'}</PhasePill>
+          <div>
+            <div className="big-number" style={{ fontSize: '6.5rem' }}>{daysTo}</div>
+            <div className="big-caption">days until your period</div>
+          </div>
+          <ConfidenceBadge level={f.confidence} />
+        </div>
+        <DotRing f={f} showFertility size={260} />
+      </div>
+    </div>
   );
 }

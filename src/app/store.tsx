@@ -9,6 +9,7 @@ import {
 } from '../data/entitlement';
 import { eraseEverything, loadPlain, readStored, save, unlock, type Stored } from '../data/vault';
 import { tourData } from './tour';
+import { useToast } from '../ui/components';
 
 export type Phase = 'loading' | 'new' | 'locked' | 'ready' | 'unavailable';
 
@@ -35,6 +36,8 @@ interface Store {
   usePreviewPass(): void;
   eraseAll(): Promise<boolean>;
   storageError?: string;
+  notice?: string;
+  notify(msg: string): void;
 }
 
 const Ctx = createContext<Store | null>(null);
@@ -57,6 +60,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const passcode = useRef<string | undefined>(undefined);
   const saveTimer = useRef<number | undefined>(undefined);
   const realData = useRef<AppData | undefined>(undefined);
+  const [notice, notify] = useToast();
 
   // Keep "today" correct across midnight without reloading.
   useEffect(() => {
@@ -205,7 +209,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     phase, today, tour, data, forecast: fc, insights, entitlement,
     locked: !!passcode.current || stored?.mode === 'locked',
     selectedDate, selectDate, update, setLog, begin, unlockWith, setPasscode, replaceData,
-    startTour, exitTour, refreshEntitlement, usePreviewPass, eraseAll, storageError,
+    startTour, exitTour, refreshEntitlement, usePreviewPass, eraseAll, storageError, notice, notify,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

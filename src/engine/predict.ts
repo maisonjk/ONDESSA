@@ -236,7 +236,7 @@ export function detectThermalShift(logs: DayLog[]): ISODate | undefined {
 }
 
 export type DayKind =
-  | 'period' | 'spotting' | 'predicted-period' | 'fertile' | 'ovulation' | 'none';
+  | 'period' | 'spotting' | 'predicted-period' | 'possible-period' | 'fertile' | 'ovulation' | 'none';
 
 /** Visual classification of a calendar day. Logged data always wins over predictions. */
 export function classifyDay(
@@ -254,6 +254,11 @@ export function classifyDay(
     const end = addDays(w.expected, f.predictedPeriodLength - 1);
     if (afterLastPeriod && date >= w.expected && date <= end) return 'predicted-period';
   }
+  // The rest of each expected window: the period could start or run on these days.
+  for (const w of windows) {
+    const end = addDays(w.latest, f.predictedPeriodLength - 1);
+    if (afterLastPeriod && date >= w.earliest && date <= end) return 'possible-period';
+  }
 
   if (showFertility && f.ovulation && f.fertile) {
     if (date === f.ovulation.expected) return 'ovulation';
@@ -266,4 +271,55 @@ export function classifyDay(
     }
   }
   return 'none';
+}
+
+export type Phase = 'menstrual' | 'follicular' | 'fertile' | 'luteal';
+
+export const PHASE_COPY: Record<Phase, { label: string; short: string }> = {
+  menstrual: { label: 'Period', short: 'Period' },
+  follicular: { label: 'Follicular phase', short: 'Follicular' },
+  fertile: { label: 'Fertile window (estimate)', short: 'Fertile' },
+  luteal: { label: 'Luteal phase (estimate)', short: 'Luteal' },
+};
+
+/**
+ * Estimated cycle phase for a date in the current cycle, used for colour and labels only.
+ * Phases after the period are estimates derived from the fertile-window estimate. When
+ * fertility estimates are hidden, the fertile window folds into the neighbouring phases.
+ */
+export function phaseOn(f: Forecast, date: ISODate, showFertility = true): Phase | undefined {
+  if (!f.lastPeriod || !f.fertile || !f.ovulation || !f.nextPeriod) return undefined;
+  if (date < f.lastPeriod.start) return undefined;
+  // With only a start date logged (e.g. from setup), assume the usual period length.
+  const periodEnd = f.lastPeriod.length > 1 ? f.lastPeriod.end : addDays(f.lastPeriod.start, f.predictedPeriodLength - 1);
+  if (date <= periodEnd) return 'menstrual';
+  if (date >= f.nextPeriod.expected) {
+    return date < addDays(f.nextPeriod.expected, f.predictedPeriodLength) ? 'menstrual' : undefined;
+  }
+  if (date < f.fertile.start) return 'follicular';
+  if (date <= f.fertile.end) {
+    if (showFertility) return 'fertile';
+    return date <= f.ovulation.expected ? 'follicular' : 'luteal';
+  }
+  return 'luteal';
+}
+
+/**
+ * The fertile window worth showing now: the current cycle's while it is still ahead or
+ * under way, otherwise a calendar projection for the next cycle.
+ */
+export function upcomingFertileWindow(
+  f: Forecast,
+): { start: ISODate; end: ISODate; ovulation: ISODate; projected: boolean } | undefined {
+  if (!f.fertile || !f.ovulation || !f.nextPeriod) return undefined;
+  if (f.today <= f.fertile.end) {
+    return { start: f.fertile.start, end: f.fertile.end, ovulation: f.ovulation.expected, projected: false };
+  }
+  const ovulation = addDays(f.nextPeriod.expected, f.predictedCycleLength - RULES.lutealDays);
+  return {
+    start: addDays(ovulation, -RULES.fertileBefore),
+    end: addDays(ovulation, RULES.fertileAfter),
+    ovulation,
+    projected: true,
+  };
 }

@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { upcomingReminders } from '../engine';
 import { AppShell, Calendar, Home, LogDay } from '../screens/app-core';
-import { Fertility, Insights, More, PregnancyView, PrivacyCenter, Settings } from '../screens/app-more';
+import { Fertility, Insights, Membership, More, PregnancyView, PrivacyCenter, Settings } from '../screens/app-more';
 import { LockScreen, Onboarding, Unavailable } from '../screens/onboarding';
 import {
   ArticlePage, ArticleView, Deleted, Help, Landing, Legal, LibraryIndex, LibraryList, Plans, PrivacyPolicy,
@@ -52,6 +52,7 @@ function appScreen(path: string) {
     case '/app/settings': return <Settings />;
     case '/app/privacy': return <PrivacyCenter />;
     case '/app/library': return <LibraryList />;
+    case '/app/membership': return <Membership />;
     default: return <Home />;
   }
 }

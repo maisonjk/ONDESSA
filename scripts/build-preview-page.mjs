@@ -21,7 +21,7 @@ const cssRef = /<link rel="stylesheet"[^>]*href="([^"]+)"[^>]*>/.exec(html)[1];
 let css = readFileSync(asset(cssRef), 'utf8');
 css = css.replace(/@font-face\{[^}]*\}/g, (face) => {
   const url = /url\(([^)]+\.woff2)\)/.exec(face)?.[1];
-  if (!url || !/-latin-wght-/.test(url)) return '';
+  if (!url || !/-latin-(wght|standard)-/.test(url)) return '';
   const data = readFileSync(join(dist, 'assets', url.split('/').pop())).toString('base64');
   return face.replace(/src:[^;}]+/, `src:url(data:font/woff2;base64,${data}) format("woff2")`);
 });
@@ -32,7 +32,7 @@ const js = readFileSync(asset(jsRef), 'utf8').replace(/<\/script/gi, '<\\/script
 html = html
   .replace(/<!doctype html>/i, '')
   .replace(/<\/?html[^>]*>|<\/?head>|<\/?body>/g, '')
-  .replace(/<meta charset[^>]*>|<meta name="viewport"[^>]*>|<meta http-equiv="Content-Security-Policy"[^>]*>/g, '')
+  .replace(/<meta name="viewport"[^>]*>|<meta http-equiv="Content-Security-Policy"[^>]*>/g, '')
   .replace(/<link rel="(icon|manifest|apple-touch-icon)"[^>]*>/g, '')
   .replace(/<link rel="stylesheet"[^>]*>/, () => `<style>${css}</style>`)
   .replace(/<script type="module"[^>]*><\/script>/, '')

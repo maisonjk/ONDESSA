@@ -28,6 +28,7 @@ AppData {
   pregnancy?: { startedOn, lmp?, clinicianDueDate? }
   pastPregnancies: Pregnancy[]
   appointments: { id, date, title ≤120, note? ≤2000 }[]
+  lastBackupOn?: ISODate                   // drives the 30-day backup reminder
 }
 
 DayLog {

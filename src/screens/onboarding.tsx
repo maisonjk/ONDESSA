@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { navigate } from '../app/router';
 import { useStore } from '../app/store';
 import { addDays, emptyData, type Goal } from '../engine';
+import { BackupNeedsPassword, readBackup } from '../data/backup';
+import { WrongPassphraseError } from '../data/crypto';
 import { Icon, Mark, MedicalNote, ToggleRow } from '../ui/components';
 
 const GOALS: { id: Goal; icon: string; title: string; detail: string }[] = [
@@ -24,7 +26,9 @@ export function Onboarding() {
   const [pin, setPin] = useState('');
   const [pin2, setPin2] = useState('');
   const [discreet, setDiscreet] = useState(true);
+  const [fertile, setFertile] = useState<boolean>();
   const steps = 4;
+  const showFertile = fertile ?? goal === 'conceive';
 
   const pinOk = !usePin || (/^\d{4,8}$/.test(pin) && pin === pin2);
   const dateOk = goal === 'pregnant' ? !!(lastStart || dueDate) : unsure || !!lastStart;
@@ -33,7 +37,7 @@ export function Onboarding() {
     const d = emptyData(today);
     d.settings.goal = goal;
     d.settings.cycle = { typicalCycleLength: cycleLen, typicalPeriodLength: periodLen };
-    d.settings.showFertility = goal !== 'perimenopause';
+    d.settings.showFertility = goal !== 'pregnant' && showFertile;
     d.settings.fertilitySigns = goal === 'conceive';
     d.settings.reminders.discreet = discreet;
     d.settings.reminders.fertileWindow = goal === 'conceive';
@@ -52,7 +56,10 @@ export function Onboarding() {
         <span className="wordmark"><Mark /> Ondessa</span>
         <button className="btn ghost" onClick={() => (step ? setStep(step - 1) : navigate('/'))}>{step ? 'Back' : 'Close'}</button>
       </header>
-      <div className="wrap"><div className="progress" aria-hidden="true"><i style={{ width: `${((step + 1) / steps) * 100}%` }} /></div></div>
+      <div className="wrap stack" style={{ '--gap': '8px' } as React.CSSProperties}>
+        <div className="progress" aria-hidden="true"><i style={{ width: `${((step + 1) / steps) * 100}%` }} /></div>
+        <span className="eyebrow" aria-live="polite">Step {step + 1} of {steps}</span>
+      </div>
 
       <main className="wrap stack fade-in" key={step} style={{ '--gap': '22px', padding: '32px 20px 48px', flex: 1 } as React.CSSProperties}>
         {step === 0 && (
@@ -67,13 +74,15 @@ export function Onboarding() {
                 ['download', 'You’re in control', 'Export or permanently delete your data whenever you want.'],
               ].map(([icon, t, d]) => (
                 <div key={t} className="row" style={{ alignItems: 'flex-start', '--gap': '14px' } as React.CSSProperties}>
-                  <span className="option ico" style={{ border: 0, padding: 0, width: 40 }}><Icon name={icon!} /></span>
+                  <span className="ico-box"><Icon name={icon!} /></span>
                   <div><div style={{ fontWeight: 600 }}>{t}</div><div className="small muted">{d}</div></div>
                 </div>
               ))}
             </div>
             <p className="small muted">Because your data lives only here, losing this device without a backup means losing your history. You can create an encrypted backup anytime.</p>
             <button className="btn block" onClick={() => setStep(1)}>I understand, continue</button>
+            <p className="small muted center">Setup is free and stays on this device. Predictions need a membership: $59.99 a year or $8.99 a month.</p>
+            <RestoreBackup />
           </>
         )}
 
@@ -102,7 +111,7 @@ export function Onboarding() {
               <label htmlFor="last">First day of your last period</label>
               <input id="last" className="input" type="date" max={today} min={addDays(today, -365)} value={lastStart} disabled={unsure} onChange={(e) => setLastStart(e.target.value)} />
             </div>
-            <label className="row small"><input type="checkbox" checked={unsure} onChange={(e) => setUnsure(e.target.checked)} /> I’m not sure. I’ll log my next period.</label>
+            <label className="check-row small"><input type="checkbox" checked={unsure} onChange={(e) => setUnsure(e.target.checked)} /> I’m not sure. I’ll log my next period.</label>
             <Stepper label="Usual cycle length" unit="days" value={cycleLen} min={15} max={90} onChange={setCycleLen} hint="Not sure? 28 is a reasonable start. Ondessa learns your real length as you log." />
             <Stepper label="Usual period length" unit="days" value={periodLen} min={1} max={15} onChange={setPeriodLen} />
             <button className="btn block" disabled={!dateOk} onClick={() => setStep(3)}>Continue</button>
@@ -128,8 +137,8 @@ export function Onboarding() {
 
         {step === 3 && (
           <>
-            <span className="eyebrow">Protection</span>
-            <h1 style={{ fontSize: 'clamp(1.8rem, 6vw, 2.4rem)' }}>Add a layer of privacy.</h1>
+            <span className="eyebrow">Privacy & display</span>
+            <h1 style={{ fontSize: 'clamp(1.8rem, 6vw, 2.4rem)' }}>Your preferences</h1>
             <div className="card">
               <ToggleRow title="Lock and encrypt with a passcode" detail="Your data is encrypted on this device. Ondessa cannot recover a forgotten passcode." checked={usePin} onChange={setUsePin} />
               {usePin && (
@@ -138,6 +147,9 @@ export function Onboarding() {
                   <input className="input pin" inputMode="numeric" type="password" autoComplete="new-password" placeholder="Repeat" aria-label="Repeat passcode" value={pin2} onChange={(e) => setPin2(e.target.value.replace(/\D/g, '').slice(0, 8))} />
                   {pin2 && pin !== pin2 && <p className="small" style={{ color: 'var(--berry-ink)' }}>Passcodes don’t match.</p>}
                 </div>
+              )}
+              {goal !== 'pregnant' && (
+                <ToggleRow title="Show estimated fertile days" detail="Off unless you’re planning a pregnancy. You can change this anytime." checked={showFertile} onChange={setFertile} />
               )}
               <ToggleRow title="Discreet notifications" detail="Reminders never mention periods, fertility or pregnancy." checked={discreet} onChange={setDiscreet} />
             </div>
@@ -172,6 +184,7 @@ export function LockScreen() {
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState(false);
   const [forgot, setForgot] = useState(false);
+  const [armed, setArmed] = useState(false);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
@@ -193,7 +206,11 @@ export function LockScreen() {
         ) : (
           <div className="stack small muted" style={{ '--gap': '10px' } as React.CSSProperties}>
             <p>Your data is encrypted with your passcode, so it cannot be recovered without it. You can erase Ondessa on this device and restore from a backup.</p>
-            <button type="button" className="btn danger" onClick={async () => { await eraseAll(); navigate('/start', true); }}>Erase and start over</button>
+            <button type="button" className="btn danger" onClick={async () => {
+              if (!armed) return setArmed(true);
+              await eraseAll();
+              navigate('/start', true);
+            }}>{armed ? 'Tap again to erase everything' : 'Erase and start over'}</button>
           </div>
         )}
       </form>
@@ -215,5 +232,38 @@ export function Unavailable({ message }: { message?: string }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Restore a backup before buying, so moving to a new device never means starting over. */
+function RestoreBackup() {
+  const { replaceData } = useStore();
+  const [text, setText] = useState<string>();
+  const [pass, setPass] = useState('');
+  const [msg, setMsg] = useState<string>();
+  const load = async (raw: string, password?: string) => {
+    try {
+      await replaceData(await readBackup(raw, password));
+      navigate('/plans', true);
+    } catch (e) {
+      if (e instanceof BackupNeedsPassword) { setText(raw); setMsg('This backup is encrypted. Enter its password.'); }
+      else if (e instanceof WrongPassphraseError) setMsg('That password did not open the backup.');
+      else setMsg(e instanceof Error ? e.message : 'Could not read that file.');
+    }
+  };
+  return (
+    <details className="card flat">
+      <summary style={{ cursor: 'pointer', fontWeight: 560 }}>Moving from another device? Restore a backup</summary>
+      <div className="stack" style={{ '--gap': '10px', marginTop: 8 } as React.CSSProperties}>
+        <input type="file" accept="application/json,.json" aria-label="Backup file" onChange={async (e) => { const f = e.target.files?.[0]; if (f) await load(await f.text()); }} />
+        {text && (
+          <div className="row wrap-row">
+            <input className="input" type="password" aria-label="Backup password" value={pass} onChange={(e) => setPass(e.target.value)} />
+            <button className="btn" onClick={() => load(text, pass)}>Unlock backup</button>
+          </div>
+        )}
+        {msg && <p className="small" role="status">{msg}</p>}
+      </div>
+    </details>
   );
 }

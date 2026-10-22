@@ -5,7 +5,7 @@ import { weekNotes } from '../content/library';
 import { BackupNeedsPassword, makeBackup, readBackup } from '../data/backup';
 import { WrongPassphraseError } from '../data/crypto';
 import {
-  CONFIDENCE_COPY, RULES, addDays, detectThermalShift, dueDateFromLmp, formatLong, formatRange, formatShort,
+  CONFIDENCE_COPY, RULES, addDays, upcomingFertileWindow, detectThermalShift, dueDateFromLmp, formatLong, formatRange, formatShort,
   pregnancyStatus, upcomingReminders, type AppData, type Confidence, type Goal,
 } from '../engine';
 import { ConfidenceBadge, Icon, MedicalNote, PageTitle, Segmented, Toast, ToggleRow, useToast } from '../ui/components';
@@ -16,6 +16,7 @@ import { Stepper } from './onboarding';
 export function Fertility() {
   const { data, forecast: f, today } = useStore();
   if (!data || !f) return null;
+  const win = upcomingFertileWindow(f);
   if (!data.settings.showFertility) {
     return (
       <div className="stack">
@@ -37,8 +38,8 @@ export function Fertility() {
 
   return (
     <div className="stack" style={{ '--gap': '18px' } as React.CSSProperties}>
-      <PageTitle eyebrow="Fertility & ovulation" title={f.fertile ? `Estimated window ${formatRange(f.fertile.start, f.fertile.end)}` : 'No estimate yet'}>
-        {f.fertile ? `Ovulation estimated around ${formatShort(f.ovulation!.expected)}. ${methodCopy[f.ovulation!.method]}.` : 'Log a period to see an estimated fertile window.'}
+      <PageTitle eyebrow="Fertility & ovulation" title={win ? `${win.projected ? 'Next estimated window' : 'Estimated window'} ${formatRange(win.start, win.end)}` : 'No estimate yet'}>
+        {win ? `Ovulation estimated around ${formatShort(win.ovulation)}. ${win.projected ? 'Projected from your cycle history.' : `${methodCopy[f.ovulation!.method]}.`}` : 'Log a period to see an estimated fertile window.'}
       </PageTitle>
 
       <div className="callout">Calendar predictions cannot confirm ovulation, fertility or pregnancy. Ondessa is not a contraceptive and must not be used to avoid pregnancy.</div>
@@ -226,6 +227,12 @@ export function Insights() {
   const { data, forecast: f, insights } = useStore();
   if (!data || !f) return null;
   const all = f.cycles.slice(-12);
+  const usableCount = f.usableCycleCount;
+  const loggedDays = Object.keys(data.logs).length;
+  const thisCycle = f.lastPeriod ? Object.values(data.logs).filter((l) => l.date >= f.lastPeriod!.start) : [];
+  const symptomCounts = new Map<string, number>();
+  for (const l of thisCycle) for (const x of l.symptoms ?? []) symptomCounts.set(x, (symptomCounts.get(x) ?? 0) + 1);
+  const topThisCycle = [...symptomCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([x, n]) => `${x} ×${n}`).join(', ');
   const maxLen = Math.max(40, ...all.map((c) => c.length));
   const levels: Confidence[] = ['limited', 'developing', 'established'];
 
@@ -243,10 +250,21 @@ export function Insights() {
             </div>
           ))}
         </div>
-        <p className="tiny faint">Rules version {RULES.version}. Thresholds are pending clinical sign-off.</p>
+        <p className="tiny faint">Prediction rules are being reviewed by clinicians before launch.</p>
       </section>
 
-      {insights.map((i) => (
+      {usableCount < 3 && (
+        <section className="card tint-phase phase-luteal stack" style={{ '--gap': '12px' } as React.CSSProperties}>
+          <span className="eyebrow">Patterns unlock after 3 complete cycles</span>
+          <div className="row" style={{ '--gap': '6px' } as React.CSSProperties} aria-label={`${usableCount} of 3 cycles complete`}>
+            {[0, 1, 2].map((i) => <span key={i} style={{ flex: 1, height: 8, borderRadius: 8, background: i < usableCount ? 'var(--phase)' : 'var(--paper)' }} />)}
+          </div>
+          <p className="small"><strong>{usableCount} of 3 cycles</strong> · {loggedDays} day{loggedDays === 1 ? '' : 's'} logged so far.</p>
+          {topThisCycle && <p className="small muted">Most logged this cycle: {topThisCycle}.</p>}
+        </section>
+      )}
+
+      {insights.filter((i) => i.id !== 'limited-history' || usableCount >= 3).map((i) => (
         <section key={i.id} className={`card stack ${i.kind === 'care' || i.kind === 'range' ? 'tint-berry' : ''}`} style={{ '--gap': '8px' } as React.CSSProperties}>
           <h3>{i.title}</h3>
           <p>{i.body}</p>
@@ -291,10 +309,10 @@ export function More() {
   const items = [
     { to: '/app/pregnancy', icon: 'heart', t: 'Pregnancy', d: 'Pregnancy mode and calendar' },
     { to: '/app/fertility', icon: 'leaf', t: 'Fertility & ovulation', d: 'Estimated window and signs' },
-    { to: '/app/library', icon: 'book', t: 'Library', d: 'Clinician-reviewed education (in review)' },
+    { to: '/app/library', icon: 'book', t: 'Library', d: 'Guides on cycles, fertility and pregnancy, with sources' },
     { to: '/app/settings', icon: 'bell', t: 'Reminders & settings', d: 'Cycle, reminders, life stage' },
     { to: '/app/privacy', icon: 'shield', t: 'Privacy center', d: 'Passcode, backup, export, delete' },
-    { to: '/plans', icon: 'spark', t: 'Membership', d: 'Plan, restore, cancel' },
+    { to: '/app/membership', icon: 'spark', t: 'Membership', d: 'Plan, renewal, membership key' },
     { to: '/help', icon: 'info', t: 'Help & legal', d: 'FAQ, terms, disclaimers' },
   ];
   return (
@@ -383,7 +401,7 @@ export function Settings() {
 /* ------------------------------------------------------------------ Privacy center */
 
 export function PrivacyCenter() {
-  const { data, today, locked, setPasscode, replaceData, eraseAll, tour } = useStore();
+  const { data, today, locked, setPasscode, replaceData, eraseAll, tour, update } = useStore();
   const [toast, showToast] = useToast();
   const [pin, setPin] = useState('');
   const [backupPass, setBackupPass] = useState('');
@@ -408,6 +426,7 @@ export function PrivacyCenter() {
     a.download = `ondessa-backup-${today}${encrypted ? '.encrypted' : ''}.json`;
     a.click();
     URL.revokeObjectURL(a.href);
+    update((d) => ({ ...d, lastBackupOn: today }));
     showToast(encrypted ? 'Encrypted backup downloaded' : 'Backup downloaded');
   };
 
@@ -475,6 +494,33 @@ export function PrivacyCenter() {
         <button className="btn danger" disabled={confirmText !== 'DELETE' || tour} onClick={async () => navigate((await eraseAll()) ? '/deleted' : '/deleted-unverified', true)}><Icon name="trash" size={18} /> Permanently delete</button>
       </section>
       <Toast msg={toast} />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ Membership (in-app) */
+
+export function Membership() {
+  const { entitlement } = useStore();
+  const active = entitlement.status === 'active';
+  const until = active ? formatLong(new Date(entitlement.expires * 1000).toISOString().slice(0, 10)) : undefined;
+  const planName = !active ? 'None' : entitlement.plan === 'preview' ? 'Preview pass' : entitlement.plan === 'annual' ? 'Yearly · $59.99' : 'Monthly · $8.99';
+  return (
+    <div className="stack" style={{ '--gap': '14px', maxWidth: 640 } as React.CSSProperties}>
+      <PageTitle eyebrow="Membership" title={active ? 'You’re a member' : 'No active membership'} />
+      <section className="card stack" style={{ '--gap': '4px' } as React.CSSProperties}>
+        <div className="row between toggle-row"><span className="muted">Plan</span><strong>{planName}</strong></div>
+        <div className="row between toggle-row"><span className="muted">{entitlement.status === 'active' && entitlement.preview ? 'Ends' : 'Renews or ends'}</span><strong className="mono">{until ?? '—'}</strong></div>
+      </section>
+      <section className="card stack" style={{ '--gap': '10px' } as React.CSSProperties}>
+        <h3>Manage or cancel</h3>
+        <p className="small muted">Subscriptions are managed where you bought them: Settings → Apple ID → Subscriptions on iPhone, Play Store → Payments & subscriptions on Android, or the link in your web receipt. Cancelling keeps access to the end of the paid period and never deletes your data.</p>
+      </section>
+      <section className="card stack" style={{ '--gap': '10px' } as React.CSSProperties}>
+        <h3>Your membership key</h3>
+        <p className="small muted">The key on this device proves your subscription without an account. It holds a random ID, your plan and an expiry date, nothing about your health. To use Ondessa on a new device, restore it from the pricing page.</p>
+        <Link to="/plans" className="btn secondary">Restore or change plan</Link>
+      </section>
     </div>
   );
 }

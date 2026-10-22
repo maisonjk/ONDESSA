@@ -3,12 +3,12 @@ import { Link, navigate } from '../app/router';
 import { useStore } from '../app/store';
 import { ARTICLES } from '../content/library';
 import {
-  addDays, classifyDay, diffDays, formatLong, formatRange, formatShort, monthGrid, monthName, pregnancyStatus,
+  addDays, classifyDay, diffDays, phaseOn, upcomingFertileWindow, weekday, PHASE_COPY, formatLong, formatRange, formatShort, monthGrid, monthName, pregnancyStatus,
   upcomingReminders, MOODS, SYMPTOMS,
-  type DayLog, type Flow, type ISODate, type Level, type Mucus,
+  type DayLog, type Flow, type ISODate, type Level, type Mucus, type Symptom,
 } from '../engine';
 import {
-  ConfidenceBadge, CycleArc, Icon, Mark, MedicalNote, PageTitle, Toast, useToast,
+  ConfidenceBadge, DotRing, Icon, Mark, MedicalNote, PageTitle, PhasePill, Toast,
 } from '../ui/components';
 
 const TABS = [
@@ -20,14 +20,17 @@ const TABS = [
 ];
 
 export function AppShell({ path, children }: { path: string; children: React.ReactNode }) {
-  const { tour, exitTour, today, storageError } = useStore();
+  const { tour, exitTour, today, storageError, notice } = useStore();
   return (
     <div className="app">
       {tour && (
         <div className="tour-banner">
           <div className="wrap">
-            <span>Product tour · sample data · nothing is saved</span>
-            <button onClick={() => { exitTour(); navigate('/'); }}>Exit tour</button>
+            <span>Tour · sample data · nothing is saved</span>
+            <span className="row" style={{ '--gap': '8px' } as React.CSSProperties}>
+              <button onClick={() => { exitTour(); navigate('/'); }}>Exit</button>
+              <button className="primary" onClick={() => { exitTour(); navigate('/start'); }}>Start with my own data</button>
+            </span>
           </div>
         </div>
       )}
@@ -39,6 +42,7 @@ export function AppShell({ path, children }: { path: string; children: React.Rea
       </header>
       {storageError && <div className="wrap" style={{ paddingTop: 12 }}><div className="callout" role="alert">{storageError}</div></div>}
       <main className="wrap main">{children}</main>
+      <Toast msg={notice} />
       <div className="tabbar">
         <nav aria-label="Main">
           {TABS.map((t) => {
@@ -59,96 +63,140 @@ export function AppShell({ path, children }: { path: string; children: React.Rea
 /* ------------------------------------------------------------------ Home */
 
 export function Home() {
-  const { data, forecast: f, insights, today, selectDate } = useStore();
+  const { data, forecast: f, insights, today, selectDate, tour } = useStore();
   if (!data || !f) return null;
   if (data.pregnancy) return <PregnancyHome />;
 
   const showFertility = data.settings.showFertility;
   const next = f.nextPeriod;
-  let headline = 'Log your period to begin';
-  let sub = 'Tap Log on the day your period starts. Predictions appear right away.';
-  if (f.inPeriod) {
-    headline = `Period · day ${f.cycleDay}`;
-    sub = `Expected to last about ${f.predictedPeriodLength} days.`;
-  } else if (next && f.daysPastExpected > 0) {
-    headline = `${f.daysPastExpected} day${f.daysPastExpected > 1 ? 's' : ''} past the expected date`;
-    sub = `Your period was projected for ${formatShort(next.expected)}. Cycles vary, and stress, illness or travel can shift timing.${data.settings.goal === 'conceive' ? ' If you might be pregnant, a home test is most reliable from now.' : ''}`;
-  } else if (next) {
-    const days = Math.max(0, diffDays(today, next.expected));
-    headline = days === 0 ? 'Period may start today' : `Period expected ${formatRange(next.earliest, next.latest)}`;
-    sub = days > 0 ? `About ${days} day${days > 1 ? 's' : ''} away.` : 'It’s within your expected window.';
+  const late = !!next && f.daysPastExpected > 0;
+  const phase = late ? undefined : phaseOn(f, today, showFertility);
+  const daysTo = next ? diffDays(today, next.expected) : undefined;
+
+  let big: string | undefined;
+  let caption: string;
+  let detail: string;
+  let pill: string;
+  if (!f.lastPeriod) {
+    caption = 'Log your period to begin';
+    detail = 'Tap Log on the day your period starts. Your first prediction appears right away.';
+    pill = 'No cycle logged yet';
+  } else if (f.inPeriod) {
+    big = String(f.cycleDay);
+    caption = 'day of your period';
+    detail = `Periods for you usually last about ${f.predictedPeriodLength} days.`;
+    pill = 'Period';
+  } else if (late) {
+    big = String(f.daysPastExpected);
+    caption = `day${f.daysPastExpected > 1 ? 's' : ''} past the expected date`;
+    detail = `Your period was projected for ${formatShort(next!.expected)}. Cycles vary, and stress, illness or travel can shift timing.${data.settings.goal === 'conceive' ? ' If you might be pregnant, a home test is most reliable from now.' : ''}`;
+    pill = 'Past expected date';
+  } else if (daysTo !== undefined && daysTo > 0) {
+    big = String(daysTo);
+    caption = `day${daysTo > 1 ? 's' : ''} until your period`;
+    detail = `Expected ${formatRange(next!.earliest, next!.latest)}.`;
+    pill = phase ? PHASE_COPY[phase].label : 'Cycle';
+  } else {
+    caption = 'Your period may start today';
+    detail = `It’s within your expected window, ${formatRange(next!.earliest, next!.latest)}.`;
+    pill = phase ? PHASE_COPY[phase].label : 'Cycle';
   }
-  const fertileNow = showFertility && f.fertile && today >= f.fertile.start && today <= f.fertile.end;
+
   const topInsight = insights.find((i) => i.kind !== 'data') ?? insights[0];
   const reminders = upcomingReminders(data, f, today, 21).filter((r) => r.id !== 'daily-log').slice(0, 3);
   const todayLog = data.logs[today];
+  const fertileWin = upcomingFertileWindow(f);
+  const loggedDays = Object.keys(data.logs).length;
+  const backupDue = !tour && loggedDays >= 30 && (!data.lastBackupOn || diffDays(data.lastBackupOn, today) > 90);
   const article = ARTICLES.find((a) => a.slug === (data.settings.goal === 'conceive' ? 'ovulation-basics' : data.settings.goal === 'perimenopause' ? 'perimenopause-basics' : 'how-predictions-work'));
 
   return (
-    <div className="stack" style={{ '--gap': '18px' } as React.CSSProperties}>
-      <section className="card hero-cycle fade-in">
-        <CycleArc f={f} showFertility={showFertility} />
-        <div className="stack" style={{ '--gap': '12px' } as React.CSSProperties}>
-          <span className="eyebrow">Today</span>
-          <h1 className="status-title">{headline}</h1>
-          <p className="muted">{sub}</p>
-          <div className="row wrap-row"><ConfidenceBadge level={f.confidence} />{f.irregular && <span className="badge">Wider window: cycles vary</span>}</div>
-          {fertileNow && <p className="small" style={{ color: 'var(--sage-ink)' }}>You are in your estimated fertile window{f.ovulation ? `; ovulation estimated around ${formatShort(f.ovulation.expected)}` : ''}.</p>}
-          <div className="legend">
-            <span><i style={{ background: 'var(--berry)' }} />Period</span>
-            {showFertility && <span><i style={{ background: 'var(--sage)' }} />Fertile window (estimate)</span>}
-            <span><i style={{ background: 'var(--paper)', boxShadow: 'inset 0 0 0 2px var(--plum)' }} />Today</span>
+    <div className="stack" style={{ '--gap': '12px' } as React.CSSProperties}>
+      <section className={`phase-hero phase-${phase ?? 'none'} fade-in`}>
+        <div className="stack" style={{ '--gap': '14px' } as React.CSSProperties}>
+          <PhasePill phase={phase}>{pill}</PhasePill>
+          <div>
+            {big && <div className="big-number" aria-hidden="true">{big}</div>}
+            <h1 className="big-caption">{big ? <span className="sr-only">{big} </span> : null}{caption}</h1>
+          </div>
+          <p className="muted" style={{ maxWidth: '38ch' }}>{detail}</p>
+          <div className="row wrap-row" style={{ '--gap': '8px' } as React.CSSProperties}>
+            <ConfidenceBadge level={f.confidence} />
+            {f.irregular && <span className="badge">Wider window</span>}
           </div>
           <details className="small">
-            <summary style={{ cursor: 'pointer', color: 'var(--berry-ink)', fontWeight: 600 }}>How is this calculated?</summary>
+            <summary style={{ cursor: 'pointer', fontWeight: 560 }}>How is this calculated?</summary>
             <ul className="muted stack" style={{ '--gap': '6px', paddingLeft: 18, marginTop: 8 } as React.CSSProperties}>
               {f.explanation.map((e) => <li key={e}>{e}</li>)}
             </ul>
           </details>
         </div>
+        <div className="stack" style={{ '--gap': '10px', alignItems: 'center' } as React.CSSProperties}>
+          <DotRing f={f} showFertility={showFertility} />
+          <div className="legend" style={{ justifyContent: 'center' }}>
+            <span><i style={{ background: 'var(--berry)' }} />Period</span>
+            <span><i style={{ background: 'var(--apricot)' }} />Follicular</span>
+            {showFertility && <span><i style={{ background: 'var(--sage)' }} />Fertile (est.)</span>}
+            <span><i style={{ background: 'var(--lavender)' }} />Luteal (est.)</span>
+          </div>
+        </div>
       </section>
 
-      <div className="grid-2">
-        <section className="card stack" style={{ '--gap': '12px' } as React.CSSProperties}>
-          <div className="row between"><h3>Today’s log</h3><button className="btn ghost" onClick={() => { selectDate(today); navigate('/app/log'); }}>Open <Icon name="chevron" size={16} /></button></div>
-          <QuickFlow date={today} />
-          <p className="small faint">{todayLog ? summarizeLog(todayLog) : 'Nothing logged yet. Everything is optional.'}</p>
+      <WeekStrip />
+
+      <div className="bento">
+        {backupDue && (
+          <section className="card tint-berry stack span-6" style={{ '--gap': '10px' } as React.CSSProperties}>
+            <span className="eyebrow">Keep your history safe</span>
+            <h3>{loggedDays} days logged, {data.lastBackupOn ? `last backup ${formatShort(data.lastBackupOn)}` : 'no backup yet'}</h3>
+            <p className="small muted">Your data lives only on this device. An encrypted backup is the only way to recover it if you lose your phone.</p>
+            <Link to="/app/privacy" className="btn">Create encrypted backup</Link>
+          </section>
+        )}
+        <section className="card stack span-3" style={{ '--gap': '14px' } as React.CSSProperties}>
+          <div className="row between">
+            <span className="eyebrow">Today’s log</span>
+            <span className="tiny faint mono">{formatShort(today).toUpperCase()}</span>
+          </div>
+          <QuickLog showFlow={showFlowFirst(f, today)} />
+          <p className="small faint">{todayLog ? summarizeLog(todayLog) : 'Nothing logged yet. Every field is optional.'}</p>
+          <button className="btn secondary" onClick={() => { selectDate(today); navigate('/app/log'); }}>Add symptoms, mood & more</button>
         </section>
 
         {topInsight && (
-          <section className="card tint-sage stack" style={{ '--gap': '8px' } as React.CSSProperties}>
-            <span className="eyebrow">My Cycle, My Patterns</span>
-            <h3>{topInsight.title}</h3>
+          <Link to="/app/insights" className="card tint-sage stack span-3" >
+            <span className="eyebrow" style={{ color: 'var(--sage-ink)' }}>My Cycle, My Patterns</span>
+            <h3 style={{ fontSize: '1.35rem' }}>{topInsight.title}</h3>
             <p className="small">{topInsight.body}</p>
             <p className="tiny muted">{topInsight.limitation}</p>
-            <Link to="/app/insights" className="btn ghost" >All patterns <Icon name="chevron" size={16} /></Link>
-          </section>
+            <span className="small" style={{ fontWeight: 560, marginTop: 'auto' }}>All patterns →</span>
+          </Link>
+        )}
+
+        {showFertility && fertileWin && (
+          <Link to="/app/fertility" className="card stack span-2 phase-fertile" >
+            <span className="eyebrow">{fertileWin.projected ? 'Next fertile window · estimate' : 'Fertile window · estimate'}</span>
+            <span className="kicker-num">{formatRange(fertileWin.start, fertileWin.end)}</span>
+            <span className="small muted">Ovulation estimated around {formatShort(fertileWin.ovulation)}. Not a confirmation.</span>
+          </Link>
         )}
 
         {reminders.length > 0 && (
-          <section className="card stack" style={{ '--gap': '4px' } as React.CSSProperties}>
-            <h3 style={{ marginBottom: 6 }}>Coming up</h3>
+          <section className="card stack span-2" style={{ '--gap': '6px' } as React.CSSProperties}>
+            <span className="eyebrow">Coming up</span>
             {reminders.map((r) => (
-              <div key={r.id} className="list-btn" style={{ cursor: 'default' }}>
-                <span>{r.title}</span><span className="small faint">{formatShort(r.date)}</span>
+              <div key={r.id} className="row between small" style={{ padding: '6px 0' }}>
+                <span>{r.title}</span><span className="faint mono tiny" style={{ whiteSpace: 'nowrap' }}>{r.date === today ? 'TODAY' : `REMIND ${formatShort(r.date).toUpperCase()}`}</span>
               </div>
             ))}
           </section>
         )}
 
-        {showFertility && f.fertile && (
-          <Link to="/app/fertility" className="card stack" >
-            <span className="eyebrow">Fertility</span>
-            <span className="serif" style={{ fontSize: '1.3rem', color: 'var(--ink)' }}>Estimated window {formatRange(f.fertile.start, f.fertile.end)}</span>
-            <span className="small muted">An estimate, not a confirmation of ovulation. See details.</span>
-          </Link>
-        )}
-
         {article && (
-          <Link to={`/app/library/${article.slug}`} className="card stack" >
-            <span className="eyebrow">Read</span>
-            <span className="serif" style={{ fontSize: '1.2rem', color: 'var(--ink)' }}>{article.title}</span>
-            <span className="small muted">{article.minutes} min · {article.summary}</span>
+          <Link to={`/app/library/${article.slug}`} className="card stack span-2" >
+            <span className="eyebrow">Read · {article.minutes} min</span>
+            <h3>{article.title}</h3>
+            <span className="small muted">{article.summary}</span>
           </Link>
         )}
       </div>
@@ -157,14 +205,87 @@ export function Home() {
   );
 }
 
+function WeekStrip() {
+  const { data, forecast: f, today, selectDate } = useStore();
+  if (!data || !f) return null;
+  const days = Array.from({ length: 7 }, (_, i) => addDays(today, i - 3));
+  const letters = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  return (
+    <section className="card" style={{ padding: 8 }} aria-label="This week">
+      <div className="week-strip">
+        {days.map((d) => {
+          const logged = data.logs[d]?.flow && data.logs[d]?.flow !== 'spotting';
+          const ph = logged ? 'menstrual' : phaseOn(f, d, data.settings.showFertility);
+          const future = d > today;
+          return (
+            <button
+              key={d}
+              type="button"
+              className={`phase-${ph ?? 'none'} ${d === today ? 'is-today' : ''}`}
+              aria-label={`${formatLong(d)}${ph ? `, ${PHASE_COPY[ph].label}${future ? ' (estimate)' : ''}` : ''}`}
+              aria-current={d === today ? 'date' : undefined}
+              onClick={() => { selectDate(d); navigate(future ? '/app/calendar' : '/app/log'); }}
+            >
+              <span className="wd">{letters[weekday(d)]}</span>
+              <span className="dn">{Number(d.slice(8))}</span>
+              <span className={`pd ${ph ? (future ? 'predicted' : '') : 'none'}`} />
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function summarizeLog(l: DayLog): string {
   const parts: string[] = [];
   if (l.flow) parts.push(l.flow === 'unspecified' ? 'period' : l.flow === 'spotting' ? 'spotting' : `${l.flow} flow`);
   if (l.symptoms?.length) parts.push(l.symptoms.join(', '));
+  if (l.pain !== undefined) parts.push(`${['no', 'mild', 'moderate', 'severe'][l.pain]} pain`);
   if (l.mood) parts.push(l.mood);
   if (l.energy) parts.push(`energy ${l.energy}/5`);
+  if (l.sleep) parts.push(`sleep ${l.sleep}/5`);
+  if (l.mucus) parts.push(`${l.mucus === 'eggwhite' ? 'egg-white' : l.mucus} mucus`);
+  if (l.lh) parts.push(`LH ${l.lh}`);
+  if (l.bbt !== undefined) parts.push(`${l.bbt.toFixed(2)}°C`);
+  if (l.intercourse) parts.push('intimacy');
   if (l.note) parts.push('note');
   return parts.length ? `Logged: ${parts.join(' · ')}` : 'Nothing logged yet.';
+}
+
+/** Flow is the first thing to offer from 2 days before the expected window, during a period, and when late. */
+function showFlowFirst(f: NonNullable<ReturnType<typeof useStore>['forecast']>, today: ISODate): boolean {
+  if (!f.lastPeriod || f.inPeriod || f.daysPastExpected > 0) return true;
+  return !!f.nextPeriod && today >= addDays(f.nextPeriod.earliest, -2);
+}
+
+/** One-tap logging for today: flow around periods, otherwise the user's most-logged symptoms and mood. */
+function QuickLog({ showFlow }: { showFlow: boolean }) {
+  const { data, setLog, today, notify } = useStore();
+  if (!data) return null;
+  const log = data.logs[today] ?? { date: today };
+  if (showFlow) return <QuickFlow date={today} />;
+  const counts = new Map<Symptom, number>();
+  for (const l of Object.values(data.logs)) for (const x of l.symptoms ?? []) counts.set(x, (counts.get(x) ?? 0) + 1);
+  const top = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([x]) => x);
+  const symptoms = [...new Set([...top, 'cramps', 'headache', 'bloating', 'fatigue'] as Symptom[])].slice(0, 4);
+  const toggle = (x: Symptom) => {
+    const on = !!log.symptoms?.includes(x);
+    setLog({ ...log, symptoms: on ? log.symptoms!.filter((y) => y !== x) : [...(log.symptoms ?? []), x] });
+    notify(on ? 'Removed' : `Logged ${x}`);
+  };
+  return (
+    <div className="stack" style={{ '--gap': '10px' } as React.CSSProperties}>
+      <div className="chips" role="group" aria-label="Quick symptoms">
+        {symptoms.map((x) => <button key={x} type="button" className="chip" aria-pressed={!!log.symptoms?.includes(x)} onClick={() => toggle(x)}>{x}</button>)}
+      </div>
+      <div className="chips" role="group" aria-label="Mood">
+        {(['calm', 'happy', 'low', 'irritable'] as const).map((m) => (
+          <button key={m} type="button" className="chip" aria-pressed={log.mood === m} onClick={() => { setLog({ ...log, mood: log.mood === m ? undefined : m }); notify('Saved on this device'); }}>{m}</button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 const FLOWS: { v: Flow; label: string }[] = [
@@ -172,12 +293,12 @@ const FLOWS: { v: Flow; label: string }[] = [
 ];
 
 function QuickFlow({ date }: { date: ISODate }) {
-  const { data, setLog } = useStore();
+  const { data, setLog, notify } = useStore();
   const log = data?.logs[date] ?? { date };
   return (
     <div className="chips" role="group" aria-label="Flow">
       {FLOWS.map((x) => (
-        <button key={x.v} type="button" className="chip berry" aria-pressed={log.flow === x.v} onClick={() => setLog({ ...log, flow: log.flow === x.v ? undefined : x.v })}>{x.label}</button>
+        <button key={x.v} type="button" className="chip berry" aria-pressed={log.flow === x.v} onClick={() => { setLog({ ...log, flow: log.flow === x.v ? undefined : x.v }); notify(log.flow === x.v ? 'Removed' : 'Saved on this device'); }}>{x.label}</button>
       ))}
     </div>
   );
@@ -199,20 +320,20 @@ export function Calendar() {
   const kind = classifyDay(f, data.logs, selectedDate, data.settings.showFertility && !data.pregnancy);
   const kindLabel: Record<string, string> = {
     period: 'Period (logged)', spotting: 'Spotting (logged)', 'predicted-period': 'Predicted period',
-    fertile: 'Estimated fertile window', ovulation: 'Estimated ovulation day', none: '',
+    'possible-period': 'Period possible (expected window)', fertile: 'Estimated fertile window', ovulation: 'Estimated ovulation day', none: '',
   };
   const monthPrefix = `${cursor.y}-${String(cursor.m).padStart(2, '0')}`;
 
   return (
     <div className="stack" style={{ '--gap': '18px' } as React.CSSProperties}>
-      <section className="card">
+      <section className="card" style={{ padding: 12 }}>
         <div className="row between" style={{ marginBottom: 14 }}>
           <button className="btn ghost" aria-label="Previous month" onClick={() => move(-1)}><Icon name="back" /></button>
           <h2 style={{ fontSize: '1.4rem' }} aria-live="polite">{monthName(cursor.m)} {cursor.y}</h2>
           <button className="btn ghost" aria-label="Next month" onClick={() => move(1)}><Icon name="chevron" /></button>
         </div>
         <div className="cal-head" aria-hidden="true">{heads.map((h, i) => <span key={i}>{h}</span>)}</div>
-        <div className="cal" role="grid" aria-label={`${monthName(cursor.m)} ${cursor.y}`}>
+        <div className="cal" aria-label={`${monthName(cursor.m)} ${cursor.y}`}>
           {grid.map((d) => {
             const k = classifyDay(f, data.logs, d, data.settings.showFertility && !data.pregnancy);
             const l = data.logs[d];
@@ -226,10 +347,12 @@ export function Calendar() {
             );
           })}
         </div>
-        <div className="legend" style={{ marginTop: 16 }}>
+        <div className="legend" style={{ marginTop: 16, padding: '0 8px 8px' }}>
           <span><i style={{ background: 'var(--berry)' }} />Logged period</span>
-          <span><i style={{ boxShadow: 'inset 0 0 0 1.5px var(--berry)' }} />Predicted</span>
-          {data.settings.showFertility && !data.pregnancy && <span><i style={{ background: 'var(--sage)' }} />Fertile estimate</span>}
+          <span><i style={{ boxShadow: 'inset 0 0 0 1.5px var(--berry)' }} />Most likely</span>
+          <span><i style={{ boxShadow: 'inset 0 0 0 1.5px var(--berry)', opacity: 0.45 }} />Possible</span>
+          {data.settings.showFertility && !data.pregnancy && <span><i style={{ background: 'var(--sage-soft)', boxShadow: 'inset 0 0 0 1px var(--sage)' }} />Fertile estimate</span>}
+          {data.settings.showFertility && !data.pregnancy && <span><i style={{ background: 'var(--sage-ink)' }} />Est. ovulation</span>}
           <span><i style={{ background: 'var(--gold)' }} />Has notes</span>
         </div>
       </section>
@@ -259,8 +382,7 @@ const MUCUS: { v: Mucus; label: string }[] = [
 ];
 
 export function LogDay() {
-  const { data, setLog, selectedDate, selectDate, today } = useStore();
-  const [toast, showToast] = useToast();
+  const { data, setLog, selectedDate, selectDate, today, notify: showToast } = useStore();
   if (!data) return null;
   const date = selectedDate > today ? today : selectedDate;
   const log: DayLog = data.logs[date] ?? { date };
@@ -356,7 +478,6 @@ export function LogDay() {
       </LogSection>
 
       <button className="btn block" onClick={() => { showToast('Saved on this device'); navigate('/app'); }}>Done</button>
-      <Toast msg={toast} />
     </div>
   );
 }

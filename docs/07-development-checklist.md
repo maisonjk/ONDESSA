@@ -14,7 +14,7 @@
 
 ## What works today
 
-All 13 screens, plus lock, recovery and tour states. On-device prediction with three confidence levels and explanations. LH and BBT refinement. Six insight templates. Pregnancy mode with appointments. Passcode encryption (AES-GCM). Plain and encrypted backup and restore. Verified deletion. Discreet reminders. Offline PWA. Strict CSP. 54 unit tests in 4 time zones. End-to-end browser run confirmed the full flow, ciphertext-only storage when locked, zero external requests and zero console errors.
+All 13 screens plus in-app Membership, lock, recovery and tour states. "Phase" design system (phase-driven colour, dot ring, Bricolage Grotesque / Geist), revised after a senior UX audit. On-device prediction with three confidence levels and explanations. LH and BBT refinement. Six insight templates. Pregnancy mode with appointments. Passcode encryption (AES-GCM). Plain and encrypted backup and restore. Verified deletion. Discreet reminders. Offline PWA. Strict CSP. 60 unit tests in 4 time zones. End-to-end browser run confirmed the full flow, ciphertext-only storage when locked, zero external requests and zero console errors.
 
 ## What's incomplete
 

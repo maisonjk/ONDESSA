@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CONFIDENCE_COPY, diffDays, type Confidence, type Forecast } from '../engine';
+import { CONFIDENCE_COPY, addDays, diffDays, phaseOn, type Confidence, type Forecast, type Phase } from '../engine';
 
 const PATHS: Record<string, string> = {
   home: 'M4 11.5 12 5l8 6.5V20a1 1 0 0 1-1 1h-4.5v-5.5h-5V21H5a1 1 0 0 1-1-1z',
@@ -40,8 +40,8 @@ export function Mark({ size = 22 }: { size?: number }) {
   // Ondessa mark: a single wave inside a soft circle.
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true">
-      <circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" strokeWidth="2" />
-      <path d="M6 17c3-4 6-4 10 0s7 4 10 0" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+      <circle cx="16" cy="16" r="15" fill="currentColor" />
+      <path d="M7 17.5c3-5 6-5 9 0s6 5 9 0" fill="none" stroke="var(--paper)" strokeWidth="2.6" strokeLinecap="round" />
     </svg>
   );
 }
@@ -91,42 +91,68 @@ export function ConfidenceBadge({ level }: { level: Confidence }) {
   );
 }
 
+const PHASE_VAR: Record<Phase, string> = {
+  menstrual: 'var(--berry)', follicular: 'var(--apricot)', fertile: 'var(--sage)', luteal: 'var(--lavender)',
+};
+
 /**
- * The cycle ring: one full predicted cycle around a circle, with logged/expected period
- * days in berry, the estimated fertile window in sage and a marker for today.
+ * The dot ring: one dot per day of the predicted cycle, coloured by estimated phase.
+ * Days already lived are solid; days ahead are faint; today is enlarged and outlined.
  */
-export function CycleArc({ f, showFertility }: { f: Forecast; showFertility: boolean }) {
-  const size = 280;
-  const r = 118;
+export function DotRing({ f, showFertility, size = 300 }: { f: Forecast; showFertility: boolean; size?: number }) {
   const c = size / 2;
-  const len = Math.max(f.predictedCycleLength, f.cycleDay ?? 0, 1);
-  const circ = 2 * Math.PI * r;
-  const seg = (fromDay: number, toDay: number) => {
-    const a = Math.max(0, fromDay - 1) / len;
-    const b = Math.min(len, toDay) / len;
-    return { dasharray: `${Math.max(0, b - a) * circ} ${circ}`, offset: -a * circ };
-  };
+  const r = size / 2 - 22;
   const start = f.lastPeriod?.start;
-  const dayOf = (d?: string) => (start && d ? diffDays(start, d) + 1 : 0);
-  const period = seg(1, f.lastPeriod?.length ?? f.predictedPeriodLength);
-  const fertile = f.fertile && showFertility ? seg(dayOf(f.fertile.start), dayOf(f.fertile.end)) : undefined;
-  const todayAngle = ((Math.min(f.cycleDay ?? 1, len) - 0.5) / len) * 2 * Math.PI - Math.PI / 2;
+  const n = Math.max(f.predictedCycleLength, f.cycleDay ?? 0, 1);
+  const todayIndex = start ? diffDays(start, f.today) : -1;
+  const dotR = Math.max(3.5, Math.min(7, (Math.PI * r) / n - 2.2));
+  const label = f.cycleDay
+    ? `Cycle day ${f.cycleDay} of about ${f.predictedCycleLength}${f.cycleDay > f.predictedCycleLength ? ', past the expected length' : ''}`
+    : 'No cycle logged yet';
 
   return (
-    <svg className="arc" viewBox={`0 0 ${size} ${size}`} role="img" aria-label={f.cycleDay ? `Cycle day ${f.cycleDay} of about ${f.predictedCycleLength}` : 'No cycle logged yet'}>
-      <g transform={`rotate(-90 ${c} ${c})`}>
-        <circle cx={c} cy={c} r={r} fill="none" stroke="var(--line)" strokeWidth="14" />
-        {start && <circle cx={c} cy={c} r={r} fill="none" stroke="var(--berry)" strokeWidth="14" strokeLinecap="round" strokeDasharray={period.dasharray} strokeDashoffset={period.offset} />}
-        {fertile && <circle className="arc-progress" cx={c} cy={c} r={r} fill="none" stroke="var(--sage)" strokeWidth="14" strokeLinecap="round" strokeDasharray={fertile.dasharray} strokeDashoffset={fertile.offset} />}
-      </g>
-      {f.cycleDay && (
-        <circle cx={c + r * Math.cos(todayAngle)} cy={c + r * Math.sin(todayAngle)} r="11" fill="var(--paper)" stroke="var(--plum)" strokeWidth="3" />
-      )}
-      <text x={c} y={c - 18} textAnchor="middle" fontSize="15" style={{ fill: 'var(--ink-3)', fontFamily: 'var(--sans)', letterSpacing: '0.12em' }}>
-        {f.cycleDay ? 'CYCLE DAY' : 'START HERE'}
+    <svg className="ring" viewBox={`0 0 ${size} ${size}`} role="img" aria-label={label}>
+      {Array.from({ length: n }, (_, i) => {
+        const a = (i / n) * 2 * Math.PI - Math.PI / 2;
+        const x = c + r * Math.cos(a);
+        const y = c + r * Math.sin(a);
+        const date = start ? addDays(start, i) : undefined;
+        const phase = date ? phaseOn(f, date, showFertility) : undefined;
+        const fill = phase ? PHASE_VAR[phase] : 'var(--line)';
+        if (i === todayIndex) {
+          return (
+            <g key={i}>
+              <circle cx={x} cy={y} r={dotR + 7} fill="var(--paper)" />
+              <circle className="dot-today" cx={x} cy={y} r={dotR + 3} fill={fill} stroke="var(--ink)" strokeWidth="2.5" />
+            </g>
+          );
+        }
+        return <circle key={i} cx={x} cy={y} r={dotR} fill={fill} fillOpacity={i < todayIndex || !start ? 1 : 0.32} />;
+      })}
+      <text x={c} y={c - 34} textAnchor="middle" fontSize="12" style={{ fontFamily: 'var(--mono)', letterSpacing: '0.12em', fill: 'var(--ink-3)' }}>
+        {f.cycleDay ? 'CYCLE DAY' : 'NO CYCLE YET'}
       </text>
-      <text x={c} y={c + 34} textAnchor="middle" fontSize="64">{f.cycleDay ?? '—'}</text>
+      <text x={c} y={c + 30} textAnchor="middle" fontSize="76" style={{ fontFamily: 'var(--display)', fontWeight: 720, fontStretch: '78%', letterSpacing: '-0.05em' }}>
+        {f.cycleDay ?? '—'}
+      </text>
+      {f.cycleDay && (
+        <text x={c} y={c + 56} textAnchor="middle" fontSize="12" style={{ fontFamily: 'var(--mono)', fill: 'var(--ink-3)' }}>
+          {`OF ~${f.predictedCycleLength}`}
+        </text>
+      )}
     </svg>
+  );
+}
+
+/** Kept for any older import; renders the dot ring. */
+export const CycleArc = DotRing;
+
+export function PhasePill({ phase, children }: { phase?: Phase; children: React.ReactNode }) {
+  return (
+    <span className={`phase-pill phase-${phase ?? 'none'}`}>
+      <i aria-hidden="true" />
+      {children}
+    </span>
   );
 }
 

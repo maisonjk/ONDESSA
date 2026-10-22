@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addDays } from './dates';
 import { derivePeriods } from './cycles';
-import { classifyDay, confidenceFor, detectThermalShift, forecast } from './predict';
+import { classifyDay, confidenceFor, detectThermalShift, forecast, phaseOn, upcomingFertileWindow } from './predict';
 import { addLog, startsFromLengths, withPeriods } from './testkit';
 import { emptyData } from './types';
 
@@ -156,5 +156,58 @@ describe('calendar classification', () => {
     expect(classifyDay(f, data.logs, '2026-04-23', true)).toBe('predicted-period');
     expect(classifyDay(f, data.logs, '2026-04-09', true)).toBe('ovulation');
     expect(classifyDay(f, data.logs, '2026-04-09', false)).toBe('none');
+  });
+});
+
+describe('phases', () => {
+  const data = withPeriods(startsFromLengths('2026-01-01', [28, 28, 28]));
+  const f = forecast(data, '2026-03-30');
+
+  it('labels each part of the current cycle', () => {
+    expect(phaseOn(f, '2026-03-26')).toBe('menstrual');
+    expect(phaseOn(f, '2026-04-01')).toBe('follicular');
+    expect(phaseOn(f, '2026-04-04')).toBe('fertile');
+    expect(phaseOn(f, '2026-04-12')).toBe('luteal');
+    expect(phaseOn(f, '2026-04-23')).toBe('menstrual');
+    expect(phaseOn(f, '2026-05-10')).toBeUndefined();
+    expect(phaseOn(f, '2026-03-01')).toBeUndefined();
+  });
+
+  it('folds the fertile window away when fertility estimates are hidden', () => {
+    expect(phaseOn(f, '2026-04-08', false)).toBe('follicular');
+    expect(phaseOn(f, '2026-04-10', false)).toBe('luteal');
+  });
+
+  it('has no phase without a logged period', () => {
+    expect(phaseOn(forecast(emptyData('2026-01-01'), '2026-03-01'), '2026-03-01')).toBeUndefined();
+  });
+});
+
+describe('uncertainty and upcoming windows', () => {
+  it('marks the rest of the expected window as a possible period', () => {
+    const data = withPeriods(['2026-03-01']); // limited data: ±3 days
+    const f = forecast(data, '2026-03-05');
+    expect(f.nextPeriod).toMatchObject({ expected: '2026-03-29', earliest: '2026-03-26', latest: '2026-04-01' });
+    expect(classifyDay(f, data.logs, '2026-03-26', true)).toBe('possible-period');
+    expect(classifyDay(f, data.logs, '2026-03-29', true)).toBe('predicted-period');
+    expect(classifyDay(f, data.logs, '2026-04-05', true)).toBe('possible-period');
+  });
+
+  it('moves to the next fertile window once this one has passed', () => {
+    const data = withPeriods(startsFromLengths('2026-01-01', [28, 28, 28]));
+    const during = upcomingFertileWindow(forecast(data, '2026-04-08'));
+    expect(during).toMatchObject({ start: '2026-04-04', end: '2026-04-10', projected: false });
+    const after = upcomingFertileWindow(forecast(data, '2026-04-15'));
+    expect(after).toMatchObject({ ovulation: '2026-05-07', start: '2026-05-02', end: '2026-05-08', projected: true });
+  });
+});
+
+describe('phase with only a start date', () => {
+  it('assumes the usual period length instead of a one-day period', () => {
+    const data = emptyData('2026-01-01');
+    data.logs['2026-03-01'] = { date: '2026-03-01', flow: 'unspecified' };
+    const f = forecast(data, '2026-03-03');
+    expect(phaseOn(f, '2026-03-04')).toBe('menstrual');
+    expect(phaseOn(f, '2026-03-06')).toBe('follicular');
   });
 });
