@@ -2,7 +2,7 @@
 
 Everything App Store Connect and Google Play Console ask for, in the order they ask for it. Listing text lives in `fastlane/metadata/` (every field is already inside its character limit), images live here in `store/`.
 
-> **Before you paste anything:** the URLs below use `ondessa.app` as a placeholder. Buy the domain (or swap in yours), point it at the Vercel deployment, and update `src/content/company.ts`. Apple rejects listings whose support or privacy URL does not load.
+> **URLs:** the store listing uses the free Vercel address (https://v0-recreate-ui-from-screenshot-f8.vercel.app). If you buy a custom domain later, point it at the Vercel project and replace the address in `src/content/company.ts` and `fastlane/metadata`. Apple rejects listings whose support or privacy URL does not load.
 
 ## 1. Images
 

@@ -17,9 +17,9 @@ Built from three independent audits on 2026-10-22: an App Store submission speci
 | No preview pass in store builds | ✅ Enforced |
 | Data-loss and security fixes from code review | ✅ 85 unit tests + 139 end-to-end tests (all 13 QA bugs and 3 accessibility issues fixed and guarded) |
 | Health content framed as general information with sources | ✅ Enforced by release:check |
-| Final Privacy Policy and Terms | ❌ Blocker: drafts in `docs/legal/` need a lawyer |
-| Company details, support email, public URLs | ❌ Blocker: fill `src/content/company.ts` |
-| Trademark clearance for "Ondessa" | ❌ Needs counsel |
+| Final Privacy Policy and Terms | ✅ Finalized in-app and in `docs/legal/` (operator: Jiae Kim) |
+| Company details, support email, public URLs | ✅ Filled; URLs use the free Vercel address until a custom domain is bought |
+| Trademark clearance for "Ondessa" | ⚠ Search tmsearch.uspto.gov before launch |
 
 ## What only you can do, in order
 

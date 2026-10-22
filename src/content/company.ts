@@ -10,10 +10,10 @@ export const COMPANY = {
   dba: '',
   /** Support inbox shown in Help and in the store listings. */
   supportEmail: 'innerlink24@gmail.com',
-  /** Public URLs for the store listings (the web build serves these pages). */
-  privacyPolicyUrl: '',
-  termsUrl: '',
-  supportUrl: '',
+  /** Public URLs for the store listings (the web build serves these pages). Free Vercel address for now; swap for a custom domain later. */
+  privacyPolicyUrl: 'https://v0-recreate-ui-from-screenshot-f8.vercel.app/#/privacy',
+  termsUrl: 'https://v0-recreate-ui-from-screenshot-f8.vercel.app/#/legal',
+  supportUrl: 'https://v0-recreate-ui-from-screenshot-f8.vercel.app/#/help',
 };
 
 /** "Jiae Kim" or "Jiae Kim, doing business as Ondessa" when a DBA is registered. */

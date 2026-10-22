@@ -27,7 +27,8 @@ check(foundDrafts.length === 0, 'No draft or placeholder wording in screens', `D
 
 // 5. Business details for the store listings.
 const company = read('src/content/company.ts');
-const empty = [...company.matchAll(/^\s+(\w+): '',/gm)].map((m) => m[1]);
+const OPTIONAL = new Set(['dba']);
+const empty = [...company.matchAll(/^\s+(\w+): '',/gm)].map((m) => m[1]).filter((k) => !OPTIONAL.has(k));
 check(empty.length === 0, 'Company details filled in', `Fill in src/content/company.ts: ${empty.join(', ')}.`);
 
 // 6. Native projects present and configured.
