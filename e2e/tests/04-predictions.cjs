@@ -249,7 +249,8 @@ module.exports = [
       await L.seed(page, L.emptyData(T, {}));
       const expect = {
         '/app': 'Log your period to begin', '/app/calendar': 'October', '/app/fertility': 'No estimate yet',
-        '/app/insights': 'What your logs show', '/app/pregnancy': 'Switch to pregnancy mode', '/app/settings': 'Reminders & settings',
+        '/app/insights': 'Your first patterns arrive in 3 cycles', '/app/you': 'Stored only on this device', '/app/share': 'Keep someone in the loop',
+        '/app/recap': 'Your first recap is on its way', '/app/history': 'Log your most recent period first', '/app/pregnancy': 'Switch to pregnancy mode', '/app/settings': 'Reminders & settings',
         '/app/privacy': 'Your data, your rules', '/app/log': L.formatLong(T),
       };
       expect['/app/calendar'] = MONTHS[Number(T.slice(5, 7)) - 1];

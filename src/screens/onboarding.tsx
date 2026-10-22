@@ -6,6 +6,7 @@ import { BackupNeedsPassword, readBackup } from '../data/backup';
 import { biometricPasscode, biometricUnlockEnabled, biometryAvailable } from '../platform/biometric';
 import { WrongPassphraseError } from '../data/crypto';
 import { Icon, Mark, MedicalNote, ToggleRow } from '../ui/components';
+import { PastPeriodsFields, cleanPastStarts } from './app-you';
 
 const GOALS: { id: Goal; icon: string; title: string; detail: string }[] = [
   { id: 'understand', icon: 'moon', title: 'Understand my cycle', detail: 'Predictions, symptoms and personal patterns.' },
@@ -28,6 +29,7 @@ export function Onboarding() {
   const [pin2, setPin2] = useState('');
   const [discreet, setDiscreet] = useState(true);
   const [fertile, setFertile] = useState<boolean>();
+  const [earlier, setEarlier] = useState(['', '']);
   const steps = 4;
   const showFertile = fertile ?? goal === 'conceive';
 
@@ -44,7 +46,10 @@ export function Onboarding() {
     d.settings.fertilitySigns = goal === 'conceive';
     d.settings.reminders.discreet = discreet;
     d.settings.reminders.fertileWindow = goal === 'conceive';
-    if (lmpOk && !unsure) d.logs[lastStart] = { date: lastStart, flow: 'unspecified' };
+    if (lmpOk && !unsure) {
+      d.logs[lastStart] = { date: lastStart, flow: 'unspecified' };
+      if (goal !== 'pregnant') for (const s of cleanPastStarts(earlier, [lastStart], today)) d.logs[s] = { date: s, flow: 'unspecified' };
+    }
     if (goal === 'pregnant') {
       d.pregnancy = { startedOn: today, ...(lmpOk ? { lmp: lastStart } : {}), ...(dueOk ? { clinicianDueDate: dueDate } : {}) };
       d.settings.reminders.periodHeadsUp = false;
@@ -115,6 +120,15 @@ export function Onboarding() {
               <input id="last" className="input" type="date" max={today} min={addDays(today, -365)} value={lastStart} disabled={unsure} onChange={(e) => setLastStart(e.target.value)} />
             </div>
             <label className="check-row small"><input type="checkbox" checked={unsure} onChange={(e) => setUnsure(e.target.checked)} /> I’m not sure. I’ll log my next period.</label>
+            {lmpOk && !unsure && (
+              <details className="card flat">
+                <summary style={{ cursor: 'pointer', fontWeight: 560, minHeight: 44, display: 'flex', alignItems: 'center' }}>Know earlier dates? Add them for a sharper first prediction</summary>
+                <div className="stack" style={{ '--gap': '10px', marginTop: 8 } as React.CSSProperties}>
+                  <p className="small muted">Rough dates are fine. Two earlier periods give Ondessa your real cycle length from day one.</p>
+                  <PastPeriodsFields values={earlier} onChange={setEarlier} max={addDays(lastStart, -15)} min={addDays(today, -730)} />
+                </div>
+              </details>
+            )}
             <Stepper label="Usual cycle length" unit="days" value={cycleLen} min={15} max={90} onChange={setCycleLen} hint="Not sure? 28 is a reasonable start. Ondessa learns your real length as you log." />
             <Stepper label="Usual period length" unit="days" value={periodLen} min={1} max={15} onChange={setPeriodLen} />
             <button className="btn block" disabled={!dateOk} onClick={() => setStep(3)}>Continue</button>

@@ -14,7 +14,7 @@
 
 ## What works today
 
-All 13 screens plus in-app Membership, lock, recovery and tour states. "Phase" design system (phase-driven colour, dot ring, Instrument Serif headlines with Bricolage Grotesque numerals), revised after a senior UX audit. On-device prediction with three confidence levels and explanations. LH and BBT refinement. Six insight templates. Pregnancy mode with appointments. Passcode encryption (AES-GCM). Plain and encrypted backup and restore. Verified deletion. Discreet reminders. Offline PWA. Strict CSP. 70 unit tests in 4 time zones and 111 end-to-end tests. End-to-end browser run confirmed the full flow, ciphertext-only storage when locked, zero external requests and zero console errors.
+All 13 screens plus in-app Membership, lock, recovery and tour states. "Phase" design system (phase-driven colour, dot ring, Instrument Serif headlines with Bricolage Grotesque numerals), revised after a senior UX audit. On-device prediction with three confidence levels and explanations. LH and BBT refinement. Six insight templates. Pregnancy mode with appointments. Passcode encryption (AES-GCM). Plain and encrypted backup and restore. Verified deletion. Discreet reminders. Offline PWA. Strict CSP. 85 unit tests in 4 time zones and 125 end-to-end tests. v2 adds the You tab, log tiles, heads-up from patterns, evidence strips, cycle recap, past-period entry, partner sharing and calendar export, check-in quick replies, appearance setting and store free-trial timeline. End-to-end browser run confirmed the full flow, ciphertext-only storage when locked, zero external requests and zero console errors.
 
 ## What's incomplete
 

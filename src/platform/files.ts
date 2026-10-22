@@ -42,12 +42,12 @@ export async function deleteVaultFile(): Promise<void> {
  * if the user completed the share, so "last backup" is never recorded for a cancelled one.
  * The temporary copy is deleted afterwards either way.
  */
-export async function shareBackupFile(name: string, text: string): Promise<boolean> {
+export async function shareBackupFile(name: string, text: string, title = 'Ondessa backup'): Promise<boolean> {
   const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem');
   const { Share } = await import('@capacitor/share');
   const written = await Filesystem.writeFile({ path: name, data: text, directory: Directory.Cache, encoding: Encoding.UTF8 });
   try {
-    await Share.share({ title: 'Ondessa backup', files: [written.uri] });
+    await Share.share({ title, files: [written.uri] });
     return true;
   } catch {
     return false; // cancelled
@@ -57,8 +57,8 @@ export async function shareBackupFile(name: string, text: string): Promise<boole
 }
 
 /** Web: trigger a normal file download. Returns true once the download was started. */
-export function downloadFile(name: string, text: string): boolean {
-  const blob = new Blob([text], { type: 'application/json' });
+export function downloadFile(name: string, text: string, type = 'application/json'): boolean {
+  const blob = new Blob([text], { type });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = name;
@@ -69,4 +69,41 @@ export function downloadFile(name: string, text: string): boolean {
 
 export async function exportBackup(name: string, text: string): Promise<boolean> {
   return isNative ? shareBackupFile(name, text) : downloadFile(name, text);
+}
+
+/** Save any generated file (e.g. a calendar file): share sheet on native, download on the web. */
+export async function exportFile(name: string, text: string, type: string, title: string): Promise<boolean> {
+  return isNative ? shareBackupFile(name, text, title) : downloadFile(name, text, type);
+}
+
+export type ShareOutcome = 'shared' | 'copied' | 'cancelled' | 'unavailable';
+
+/**
+ * Hand plain text to the system share sheet so the user sends it herself. On browsers
+ * without a share sheet, copy it to the clipboard instead. Ondessa never sends it.
+ */
+export async function shareText(title: string, text: string): Promise<ShareOutcome> {
+  if (isNative) {
+    try {
+      const { Share } = await import('@capacitor/share');
+      await Share.share({ title, text });
+      return 'shared';
+    } catch {
+      return 'cancelled';
+    }
+  }
+  if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+    try {
+      await navigator.share({ title, text });
+      return 'shared';
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return 'cancelled';
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    return 'copied';
+  } catch {
+    return 'unavailable';
+  }
 }

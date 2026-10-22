@@ -6,7 +6,7 @@
 
 ## The short version
 
-Ondessa keeps your health information on your device. We do not have an account system, we do not receive your cycle, fertility, pregnancy or symptom data, and we do not sell or share it. There is no advertising or analytics software in the app.
+Ondessa keeps your health information on your device. We do not have an account system, we do not receive your cycle, fertility, pregnancy or symptom data, and we do not sell or share it. There is no advertising or analytics software in the app. If you choose to share an update, a cycle recap or a calendar file with someone, the app hands it to an app you pick (for example Messages, email or your calendar) and you send it yourself; we never receive it, and it includes only the items you switched on.
 
 ## 1. Information that stays on your device
 
@@ -42,7 +42,7 @@ We do not collect your name, email, phone number, date of birth or location in t
 
 ## 4. Your choices and rights
 
-- **Delete:** More → Privacy center → Delete everything permanently removes all Ondessa data from your device. Deleting the app also removes it.
+- **Delete:** You → Privacy center → Delete everything permanently removes all Ondessa data from your device. Deleting the app also removes it.
 - **Export:** Privacy center → Backup & export.
 - **Notifications:** turn reminders on or off in Settings, or in your device's notification settings.
 - **Subscriptions:** manage or cancel in your App Store or Google Play account.

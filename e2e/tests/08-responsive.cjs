@@ -4,7 +4,7 @@ const L = require('../lib.cjs');
 
 const T = L.today();
 const PUBLIC = ['/', '/plans', '/library', '/library/how-predictions-work', '/legal', '/help', '/privacy'];
-const APP = ['/app', '/app/calendar', '/app/log', '/app/fertility', '/app/pregnancy', '/app/insights', '/app/more', '/app/settings', '/app/privacy', '/app/membership', '/app/library'];
+const APP = ['/app', '/app/calendar', '/app/log', '/app/fertility', '/app/pregnancy', '/app/insights', '/app/more', '/app/you', '/app/share', '/app/recap', '/app/history', '/app/settings', '/app/privacy', '/app/membership', '/app/library'];
 
 function richData() {
   const d = L.emptyData(T, { logs: L.cycleHistory(L.addDays(T, -12), [28, 30, 27, 29]), settings: { goal: 'conceive', fertilitySigns: true, intercourseLogging: true } });

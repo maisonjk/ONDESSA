@@ -145,10 +145,10 @@ module.exports = [
     async run() {
       const { page } = await L.open();
       await L.seed(page, L.emptyData(T, { logs: L.addPeriod({}, L.addDays(T, -9)) }));
-      for (const n of ['Calendar', 'Patterns', 'More']) await page.getByRole('link', { name: n, exact: true }).click();
+      for (const n of ['Calendar', 'Insights', 'You']) await page.getByRole('link', { name: n, exact: true }).click();
       await page.goBack();
       await page.waitForURL(/#\/app\/insights$/);
-      assert.equal(await page.locator('.tabbar [aria-current=page]').textContent(), 'Patterns');
+      assert.equal(await page.locator('.tabbar [aria-current=page]').textContent(), 'Insights');
       await page.goBack();
       await page.waitForURL(/#\/app\/calendar$/);
       await page.goBack();

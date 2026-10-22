@@ -7,3 +7,6 @@ export * from './pregnancy';
 export * from './patterns';
 export * from './reminders';
 export * from './validate';
+export * from './headsup';
+export * from './recap';
+export * from './share';

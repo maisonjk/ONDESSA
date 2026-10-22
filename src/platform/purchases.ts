@@ -21,15 +21,19 @@ export interface StoreProduct {
   plan: StorePlan;
   /** Localised price string from the store, e.g. "$59.99". */
   price: string;
+  /** Introductory free trial configured in App Store Connect / Play Console, if offered. */
+  trial?: { days: number; label: string };
 }
 
 export type PurchaseResult = 'purchased' | 'cancelled' | 'unavailable' | 'error';
 
 // Minimal typing for the subset of the plugin's global API used here.
-interface CdvOffer { id: string }
+interface CdvPhase { paymentMode?: string; billingPeriod?: string }
+interface CdvOffer { id: string; pricingPhases?: CdvPhase[] }
 interface CdvProduct {
   id: string;
   pricing?: { price: string };
+  offers?: CdvOffer[];
   getOffer(id?: string): CdvOffer | undefined;
 }
 interface CdvError { code: number; message: string }
@@ -93,8 +97,23 @@ export async function loadProducts(): Promise<StoreProduct[]> {
   if (!C) return [];
   return (Object.keys(PRODUCT_IDS) as StorePlan[]).flatMap((plan) => {
     const p = C.store.get(PRODUCT_IDS[plan], storePlatform(C));
-    return p?.pricing ? [{ plan, price: p.pricing.price }] : [];
+    if (!p?.pricing) return [];
+    const phase = p.offers?.flatMap((o) => o.pricingPhases ?? []).find((ph) => ph.paymentMode === 'FreeTrial');
+    const trial = phase?.billingPeriod ? parseTrial(phase.billingPeriod) : undefined;
+    return [{ plan, price: p.pricing.price, ...(trial ? { trial } : {}) }];
   });
+}
+
+/** ISO 8601 period ("P14D", "P1W", "P1M") to a day count and a readable label. */
+export function parseTrial(period: string): { days: number; label: string } | undefined {
+  const m = /^P(\d+)([DWMY])$/.exec(period);
+  if (!m) return undefined;
+  const n = Number(m[1]);
+  const unit = m[2] as 'D' | 'W' | 'M' | 'Y';
+  const days = n * { D: 1, W: 7, M: 30, Y: 365 }[unit];
+  const word = { D: 'day', W: 'week', M: 'month', Y: 'year' }[unit];
+  const label = unit === 'W' && n * 7 <= 28 ? `${n * 7} days` : `${n} ${word}${n === 1 ? '' : 's'}`;
+  return days > 0 ? { days, label } : undefined;
 }
 
 /** The plan this device's store account currently owns, if any. */

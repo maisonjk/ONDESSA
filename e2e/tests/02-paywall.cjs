@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const L = require('../lib.cjs');
 
 const T = L.today();
-const APP_ROUTES = ['/app', '/app/calendar', '/app/log', '/app/fertility', '/app/pregnancy', '/app/insights', '/app/more', '/app/settings', '/app/privacy', '/app/membership', '/app/library'];
+const APP_ROUTES = ['/app', '/app/calendar', '/app/log', '/app/fertility', '/app/pregnancy', '/app/insights', '/app/more', '/app/you', '/app/share', '/app/recap', '/app/history', '/app/settings', '/app/privacy', '/app/membership', '/app/library'];
 
 module.exports = [
   {

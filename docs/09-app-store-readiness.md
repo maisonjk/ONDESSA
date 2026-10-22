@@ -15,7 +15,7 @@ Built from three independent audits on 2026-10-22: an App Store submission speci
 | Privacy manifest, Face ID text, icons, splash | ✅ |
 | Android target API 36, cloud backup off, no exact alarms | ✅ |
 | No preview pass in store builds | ✅ Enforced |
-| Data-loss and security fixes from code review | ✅ 70 unit tests + 111 end-to-end tests (all 13 QA bugs and 3 accessibility issues fixed and guarded) |
+| Data-loss and security fixes from code review | ✅ 85 unit tests + 125 end-to-end tests (all 13 QA bugs and 3 accessibility issues fixed and guarded) |
 | Clinical review of content and prediction thresholds | ❌ Blocker: needs a licensed clinician |
 | Final Privacy Policy and Terms | ❌ Blocker: drafts in `docs/legal/` need a lawyer |
 | Company details, support email, public URLs | ❌ Blocker: fill `src/content/company.ts` |
@@ -64,6 +64,9 @@ npx cap open android          # Android Studio
 | Restore | Delete the app, reinstall, restore purchases; second device with the same Apple ID |
 | Expiry | Sandbox renewal and expiry (accelerated renewal times); refund (access removed after validation) |
 | Reminders | Enable each reminder; permission prompt appears only then; notification text is discreet; fires at 9:00 |
+| Check-in quick replies | On the expected day, long-press the check-in: "Yes, today" logs a period day, "Spotting" logs spotting, "Not yet" logs nothing; with a passcode set, the entry is applied after unlock |
+| Free trial | Configure an introductory free trial on both subscriptions in App Store Connect and Play Console; confirm Plans shows the timeline and "Start … free trial", and the local reminder fires 2 days before the end |
+| Sharing | Partner sharing opens the share sheet with only the switched-on items; the calendar file imports into Calendar with "Ondessa" titles when discreet wording is on |
 | Face ID | Enable, background for more than 5 minutes (auto-lock), unlock with Face ID, fall back to passcode, change passcode (Face ID turns off) |
 | Data | Log for several days, force-quit mid-edit, reopen (nothing lost); airplane mode (everything works); low-storage device |
 | Backup | Encrypted backup to Files; cancel the share sheet (no "last backup" recorded); restore on a fresh install before purchase |
@@ -72,7 +75,7 @@ npx cap open android          # Android Studio
 
 ## Reviewer notes (paste into App Store Connect)
 
-> Ondessa has no account or login; health data is stored only on the device. To test: tap "I understand, continue" and choose "Understand my cycle". Enter any recent date as the last period start and finish setup. The subscription screen appears; buy either plan with a Sandbox Apple ID. "Restore purchases" is on the same screen and under More → Membership. Reminders are under More → Reminders & settings, and Face ID unlock is under More → Privacy center once a passcode is set. The app does not use HealthKit. It is not a medical device and not a contraceptive; predictions are labelled as estimates with confidence levels, and each article lists its sources and clinical reviewer.
+> Ondessa has no account or login; health data is stored only on the device. To test: tap "I understand, continue" and choose "Understand my cycle". Enter any recent date as the last period start and finish setup. The subscription screen appears; buy either plan with a Sandbox Apple ID. "Restore purchases" is on the same screen and under You → Membership. Reminders are under You → Reminders & settings, and Face ID unlock is under You → Privacy center once a passcode is set. The app does not use HealthKit. It is not a medical device and not a contraceptive; predictions are labelled as estimates with confidence levels, and each article lists its sources and clinical reviewer.
 
 ## App Privacy (Apple) and Data safety (Google)
 

@@ -226,6 +226,10 @@ async function onboard(page, opts = {}) {
   } else {
     if (opts.unsure) await page.getByLabel('I’m not sure. I’ll log my next period.').check();
     else if (opts.lastStart) await page.fill('#last', opts.lastStart);
+    if (opts.earlier?.length) {
+      await page.getByText('Know earlier dates?').click();
+      for (const [i, d] of opts.earlier.entries()) await page.fill(`#past-${i}`, d);
+    }
     if (opts.cycleLen !== undefined) await setStepper(page, 'Usual cycle length', 28, opts.cycleLen);
     if (opts.periodLen !== undefined) await setStepper(page, 'Usual period length', 5, opts.periodLen);
   }

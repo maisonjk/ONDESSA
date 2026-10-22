@@ -1,8 +1,10 @@
-import { Component, useEffect, type ReactNode } from 'react';
+import { Component, useEffect, useState, type ReactNode } from 'react';
+import { onReminderAction, type ReminderAction } from '../platform/notifications';
 import { upcomingReminders } from '../engine';
 import { AppShell, Calendar, Home, LogDay } from '../screens/app-core';
-import { Fertility, Insights, Membership, More, PregnancyView, PrivacyCenter, Settings } from '../screens/app-more';
+import { Fertility, Insights, Membership, PregnancyView, PrivacyCenter, Settings } from '../screens/app-more';
 import { LockScreen, Onboarding, Unavailable } from '../screens/onboarding';
+import { PartnerShare, PastPeriods, Recap, You } from '../screens/app-you';
 import {
   ArticlePage, ArticleView, Deleted, Help, Landing, Legal, LibraryIndex, LibraryList, Plans, PrivacyPolicy,
 } from '../screens/public';
@@ -23,6 +25,7 @@ function Routes() {
   const store = useStore();
   const { phase, data, entitlement, tour, exitTour } = store;
   useOpenNotification();
+  useReminderActions();
 
   // The tour lives only inside the app screens; leaving them ends it, so nothing that
   // writes to storage (setup, restore, delete) can ever run on sample data.
@@ -67,7 +70,11 @@ function appScreen(path: string) {
     case '/app/fertility': return <Fertility />;
     case '/app/pregnancy': return <PregnancyView />;
     case '/app/insights': return <Insights />;
-    case '/app/more': return <More />;
+    case '/app/you':
+    case '/app/more': return <You />;
+    case '/app/share': return <PartnerShare />;
+    case '/app/recap': return <Recap />;
+    case '/app/history': return <PastPeriods />;
     case '/app/settings': return <Settings />;
     case '/app/privacy': return <PrivacyCenter />;
     case '/app/library': return <LibraryList base="/app/library" />;
@@ -100,6 +107,33 @@ function useOpenNotification() {
       /* notifications or storage unavailable */
     }
   }, [data, forecast, today, tour, phase]);
+}
+
+/**
+ * Quick replies from the period check-in notification. "Yes, today" and "Spotting" log
+ * today straight away (after unlock, if a passcode is set); "Not yet" does nothing, and
+ * the next check-in follows from the updated prediction.
+ */
+function useReminderActions() {
+  const { data, setLog, today, tour, notify } = useStore();
+  const [pending, setPending] = useState<ReminderAction>();
+  useEffect(() => onReminderAction(setPending), []);
+  useEffect(() => {
+    if (!pending || !data || tour) return;
+    setPending(undefined);
+    if (pending === 'started' || pending === 'spotting') {
+      const log = data.logs[today] ?? { date: today };
+      if (!log.flow || (pending === 'started' && log.flow === 'spotting')) {
+        setLog({ ...log, flow: pending === 'started' ? 'unspecified' : 'spotting' });
+      }
+      notify(pending === 'started' ? 'Period logged for today' : 'Spotting logged for today');
+      navigate('/app');
+    } else if (pending === 'open') {
+      navigate('/app/log');
+    } else {
+      notify('Okay. Log it whenever it starts.');
+    }
+  }, [pending, data, tour, today, setLog, notify]);
 }
 
 /** Any rendering error shows a recovery screen instead of a blank page. Data is untouched. */
