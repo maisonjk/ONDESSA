@@ -2,7 +2,7 @@
 
 A private, paid cycle, fertility and pregnancy companion. Local-first: health data lives on the user's device, predictions are deterministic and explained, and nothing about anyone's body is sent to a server.
 
-> **Ondessa** is a working name pending trademark clearance. It replaces the original "Luma Cycle" placeholder.
+> Operated by Jiae Kim (sole proprietor). Run a trademark search on the name before launch.
 
 ## Run it
 

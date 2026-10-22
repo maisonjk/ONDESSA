@@ -3,7 +3,7 @@ import { Link, navigate } from '../app/router';
 import { useStore } from '../app/store';
 import { ARTICLES, CATEGORIES } from '../content/library';
 import type { Goal } from '../engine';
-import { COMPANY } from '../content/company';
+import { COMPANY, OPERATOR } from '../content/company';
 import { activateToken, previewPassAvailable } from '../data/entitlement';
 import { isNative, openExternal, platform } from '../platform';
 import { loadProducts, purchase, restorePurchases, type StorePlan } from '../platform/purchases';
@@ -75,7 +75,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
             {!isNative && <Link to="/library">Library</Link>}
           </div>
           <MedicalNote />
-          <p className="tiny">Ondessa is a working name pending trademark clearance. © 2026.</p>
+          <p className="tiny">Ondessa is operated by {OPERATOR}. © 2026.</p>
         </div>
       </footer>
     </div>
@@ -456,7 +456,7 @@ export function Legal() {
   return (
     <PublicShell>
       <div className="wrap main prose stack" style={{ '--gap': '12px' } as React.CSSProperties}>
-        <span className="eyebrow">Draft · pending legal review</span>
+        <span className="eyebrow">Terms of use</span>
         <h1 style={{ fontSize: 'clamp(1.9rem, 5vw, 2.6rem)' }}>Terms & disclaimers</h1>
         <h2>Not a medical device</h2>
         <p>Ondessa is a wellness and education product. It is not a medical device, does not diagnose, treat or prevent any condition, and is not a substitute for care from a qualified healthcare professional, including prenatal care.</p>
@@ -468,7 +468,12 @@ export function Legal() {
         <p>Ondessa is a paid subscription at the price shown before purchase. Subscriptions renew automatically until cancelled. You can cancel anytime through the store or billing account you purchased with; access continues to the end of the paid period. Refunds follow the policy shown on the pricing page and any rights you have under local law.</p>
         <h2>Your data</h2>
         <p>Health data you enter is stored on your device. You are responsible for keeping backups if you want to restore data on a new device. See the Privacy page for details.</p>
-        <p className="small faint">These terms are a working draft and will be replaced by lawyer-reviewed terms before launch.</p>
+        <h2>Content</h2>
+        <p>Articles and pregnancy notes are general information drawn from the listed sources. They have not been reviewed by a medical professional and are not personal medical advice.</p>
+        <h2>Limitation of liability</h2>
+        <p>Ondessa is provided “as is”. To the extent the law allows, we are not liable for decisions made based on the app, and our total liability is limited to what you paid for Ondessa in the 12 months before a claim. Nothing here limits rights you have as a consumer that cannot be limited by law.</p>
+        <h2>Who we are</h2>
+        <p>Ondessa is operated by {OPERATOR}, a sole proprietor. Contact: <a href={`mailto:${COMPANY.supportEmail}`}>{COMPANY.supportEmail}</a>. These terms are governed by the laws of California, USA.</p>
       </div>
     </PublicShell>
   );
@@ -515,7 +520,7 @@ export function PrivacyPolicy() {
   return (
     <PublicShell>
       <div className="wrap main prose stack" style={{ '--gap': '12px' } as React.CSSProperties}>
-        <span className="eyebrow">Plain-language summary · full policy pending legal review</span>
+        <span className="eyebrow">Privacy policy · plain-language summary</span>
         <h1 style={{ fontSize: 'clamp(1.9rem, 5vw, 2.6rem)' }}>Privacy at Ondessa</h1>
         <h2>What stays on your device</h2>
         <p>Everything you log: periods, symptoms, moods, temperatures, tests, notes, pregnancy details and appointments, along with every prediction and insight. Calculations run on your device.</p>
@@ -531,6 +536,8 @@ export function PrivacyPolicy() {
         </ul>
         <h2>Honest limits</h2>
         <p>We cannot promise perfect security or anonymity. Anyone who can unlock your device and open the app can see your data unless you set an Ondessa passcode. Browser storage can be cleared by the browser or by you. Keep an encrypted backup.</p>
+        <h2>Your rights and contact</h2>
+        <p>You can delete or export everything yourself from the Privacy center. For anything else, contact {OPERATOR}, who operates Ondessa, at <a href={`mailto:${COMPANY.supportEmail}`}>{COMPANY.supportEmail}</a>. Ondessa is intended for people aged 18 and over.</p>
       </div>
     </PublicShell>
   );
