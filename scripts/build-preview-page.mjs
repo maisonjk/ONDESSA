@@ -21,7 +21,7 @@ const cssRef = /<link rel="stylesheet"[^>]*href="([^"]+)"[^>]*>/.exec(html)[1];
 let css = readFileSync(asset(cssRef), 'utf8');
 css = css.replace(/@font-face\{[^}]*\}/g, (face) => {
   const url = /url\(([^)]+\.woff2)\)/.exec(face)?.[1];
-  if (!url || !/-latin-(wght|standard)-/.test(url)) return '';
+  if (!url || !/-latin-(wght|standard|400)-/.test(url)) return '';
   const data = readFileSync(join(dist, 'assets', url.split('/').pop())).toString('base64');
   return face.replace(/src:[^;}]+/, `src:url(data:font/woff2;base64,${data}) format("woff2")`);
 });

@@ -58,7 +58,7 @@ export function Landing() {
           <div className="hero-grid">
             <div className="stack fade-in" style={{ '--gap': '22px' } as React.CSSProperties}>
               <span className="eyebrow">Cycle · Fertility · Pregnancy</span>
-              <h1>Know your rhythm. Keep it yours.</h1>
+              <h1>Know your rhythm. <em>Keep it yours.</em></h1>
               <p className="lede">
                 Ondessa learns your patterns from what you log, explains every prediction, and keeps your data on your device. No account. No ads. No guesswork dressed up as AI.
               </p>
@@ -94,7 +94,7 @@ export function Landing() {
         <section className="wrap stack" style={{ '--gap': '24px' } as React.CSSProperties}>
           <div className="stack" style={{ '--gap': '12px', maxWidth: 640 } as React.CSSProperties}>
             <span className="eyebrow">Colour that means something</span>
-            <h2>Your cycle has four phases. Ondessa shows you where you are.</h2>
+            <h2>Your cycle has four phases. Ondessa shows you <em>where you are.</em></h2>
             <p className="muted">The app takes on the colour of your current phase, estimated from your own history. Plan a pregnancy, follow a pregnancy week by week, or track changing cycles in perimenopause. You choose what to track, and nothing assumes you want children or have textbook cycles.</p>
           </div>
           <div className="phase-key">
@@ -116,7 +116,7 @@ export function Landing() {
         <section className="dark-band">
           <div className="wrap stack" style={{ '--gap': '18px', maxWidth: 760 } as React.CSSProperties}>
             <span className="eyebrow">Our privacy architecture</span>
-            <h2>We built it so we can’t see your cycle.</h2>
+            <h2>We built it so we <em>can’t</em> see your cycle.</h2>
             <ul className="stack" style={{ '--gap': '10px', paddingLeft: 20 } as React.CSSProperties}>
               <li>Your logs, predictions and notes are stored and calculated on your device.</li>
               <li>No advertising or analytics SDKs, and no AI service ever receives your health records.</li>

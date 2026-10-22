@@ -132,7 +132,7 @@ export function DotRing({ f, showFertility, size = 300 }: { f: Forecast; showFer
       <text x={c} y={c - 34} textAnchor="middle" fontSize="12" style={{ fontFamily: 'var(--mono)', letterSpacing: '0.12em', fill: 'var(--ink-3)' }}>
         {f.cycleDay ? 'CYCLE DAY' : 'NO CYCLE YET'}
       </text>
-      <text x={c} y={c + 30} textAnchor="middle" fontSize="76" style={{ fontFamily: 'var(--display)', fontWeight: 720, fontStretch: '78%', letterSpacing: '-0.05em' }}>
+      <text x={c} y={c + 30} textAnchor="middle" fontSize="76" style={{ fontFamily: 'var(--numeric)', fontWeight: 720, fontStretch: '78%', letterSpacing: '-0.05em' }}>
         {f.cycleDay ?? '—'}
       </text>
       {f.cycleDay && (
