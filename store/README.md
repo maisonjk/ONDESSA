@@ -18,7 +18,7 @@ The app is set to iPhone only, so no iPad screenshots are needed. Every screen i
 
 Upload in numbered order. Slide 1 is what most people see in search, so it carries the core promise.
 
-Regenerate after any design or content change, and again after clinical sign-off so the pregnancy slide shows "Reviewed by" instead of "Clinical review in progress":
+Regenerate after any design or content change:
 
 ```
 npm run store:assets
@@ -85,7 +85,7 @@ To review:
 
 Ondessa is not a medical device and says so on the Today screen, in onboarding and in the Terms. Predictions are estimates with visible confidence levels; the app never claims to confirm ovulation or pregnancy and is not contraception.
 
-Health content was reviewed by <clinician name, credentials>.
+Health content is general information with sources listed on every article; it is not presented as medical advice.
 Contact: <name, phone, email>
 ```
 

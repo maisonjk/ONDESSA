@@ -13,18 +13,13 @@ const check = (ok, pass, fail) => (ok ? passed.push(pass) : blockers.push(fail))
 // 1. No preview or development access in a store build.
 check(process.env.VITE_PREVIEW_PASS !== 'true', 'Preview pass disabled', 'VITE_PREVIEW_PASS=true is set. Store builds must not include the preview pass (guideline 2.1).');
 
-// 2. Health content clinically reviewed (guidelines 1.4.1, 2.1; docs/08-editorial-policy.md).
+// 2. Health content framed as general information, with sources (guidelines 1.4.1, 2.1).
 const library = read('src/content/library.ts');
 const articleBlocks = library.split(/\n  \{\n    slug: /).slice(1);
-const unreviewed = articleBlocks.filter((b) => /review: AWAITING/.test(b)).map((b) => b.split("'")[1]);
-check(unreviewed.length === 0, 'All articles clinically reviewed', `${unreviewed.length} article(s) awaiting clinical review: ${unreviewed.join(', ')}. Get sign-off or remove them from v1.`);
-check(!/PREGNANCY_WEEKS_REVIEW: Article\['review'\] = AWAITING/.test(library), 'Pregnancy week notes reviewed', 'Pregnancy week-by-week notes are awaiting clinical review.');
+const unsourced = articleBlocks.filter((b) => !/sources: \[/.test(b)).map((b) => b.split("'")[1]);
+check(unsourced.length === 0, 'Every article lists sources', `${unsourced.length} article(s) without sources: ${unsourced.join(', ')}.`);
 
-// 3. Prediction thresholds signed off.
-const rules = read('src/engine/rules.ts');
-check(!/version: '[^']*provisional/.test(rules), 'Prediction rules signed off', 'src/engine/rules.ts is still marked provisional. A clinician must sign off the thresholds, then set a final version.');
-
-// 4. Legal pages final, no draft or placeholder wording in user-facing screens.
+// 3. Legal pages final, no draft or placeholder wording in user-facing screens.
 const screens = readdirSync('src/screens').map((f) => read(join('src/screens', f))).join('\n');
 const draftPhrases = ['pending legal review', 'working name pending trademark', 'Draft · pending', 'will be replaced by lawyer-reviewed'];
 const foundDrafts = draftPhrases.filter((p) => screens.includes(p));

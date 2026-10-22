@@ -47,4 +47,4 @@ public/        PWA manifest, icon, service worker, security headers
 
 ## Not medical advice
 
-Ondessa is a wellness and education product, not a medical device, and not contraception. Educational content is draft and awaiting clinical review.
+Ondessa is a wellness and education product, not a medical device, and not contraception. Educational content is general information with sources, not medical advice.

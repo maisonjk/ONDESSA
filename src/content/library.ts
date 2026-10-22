@@ -1,10 +1,9 @@
 /**
  * Static, versioned educational content. Ships with the app; no CMS, no network.
  *
- * EDITORIAL STATUS: every entry below is an engineering draft written from the cited
- * public sources. None has been clinically reviewed yet. The UI shows the review status on
- * every article, and the launch checklist blocks release until each has a named reviewer
- * and review date (docs/08-editorial-policy.md).
+ * General educational information written from the cited public sources. Not medical
+ * advice; every article lists its sources and points to a doctor or midwife for personal
+ * questions (docs/08-editorial-policy.md).
  */
 
 export type Category =
@@ -33,11 +32,9 @@ export interface Article {
   minutes: number;
   sections: { heading?: string; body: string[] }[];
   sources: Source[];
-  review: { status: 'awaiting-clinical-review' } | { status: 'reviewed'; reviewer: string; credentials: string; date: string };
   drafted: string;
 }
 
-const AWAITING = { status: 'awaiting-clinical-review' } as const;
 
 const S = {
   acogCycle: { label: 'ACOG: Your Changing Body / menstruation FAQs', url: 'https://www.acog.org/womens-health/faqs' },
@@ -65,7 +62,6 @@ export const ARTICLES: Article[] = [
     summary: 'A cycle runs from the first day of one period to the day before the next. Typical is a range, not a number.',
     minutes: 3,
     drafted: '2026-10-22',
-    review: AWAITING,
     sources: [S.figo, S.nhsPeriods, S.acogCycle],
     sections: [
       { body: [
@@ -88,7 +84,6 @@ export const ARTICLES: Article[] = [
     summary: 'Plain rules, run on your device. No AI guessing, nothing sent anywhere.',
     minutes: 4,
     drafted: '2026-10-22',
-    review: AWAITING,
     sources: [S.figo, S.wilcox],
     sections: [
       { body: [
@@ -112,7 +107,6 @@ export const ARTICLES: Article[] = [
     summary: 'A predicted fertile window is not proof of ovulation. Here’s why.',
     minutes: 4,
     drafted: '2026-10-22',
-    review: AWAITING,
     sources: [S.wilcox, S.nichdFert, S.nhsTtc],
     sections: [
       { body: [
@@ -136,15 +130,14 @@ export const ARTICLES: Article[] = [
     summary: 'The most fertile days are the few before ovulation, not after.',
     minutes: 3,
     drafted: '2026-10-22',
-    review: AWAITING,
     sources: [S.wilcox, S.asrm, S.nhsTtc],
     sections: [
       { body: [
         'Research following couples day by day found that pregnancy was most likely when sex happened in the 5 days before ovulation and on the day of ovulation itself.',
-        'Because ovulation is hard to pinpoint, many clinicians suggest sex every 1 to 2 days through the fertile window, or every 2 to 3 days throughout the cycle, rather than aiming for one “perfect” day.',
+        'Because ovulation is hard to pinpoint, common guidance suggests sex every 1 to 2 days through the fertile window, or every 2 to 3 days throughout the cycle, rather than aiming for one “perfect” day.',
       ] },
       { heading: 'When to ask for help', body: [
-        'Common guidance is to talk to a clinician after 12 months of trying if you are under 35, after 6 months if you are 35 or older, or sooner if cycles are very irregular, absent, or you have a known condition. These are general guidelines; your clinician can advise for your situation.',
+        'Common guidance is to talk to a doctor after 12 months of trying if you are under 35, after 6 months if you are 35 or older, or sooner if cycles are very irregular, absent, or you have a known condition. These are general guidelines; a doctor can advise for your situation.',
         'Ondessa cannot assess or diagnose fertility.',
       ] },
     ],
@@ -156,7 +149,6 @@ export const ARTICLES: Article[] = [
     summary: 'Home tests are most reliable from the first day of a missed period.',
     minutes: 2,
     drafted: '2026-10-22',
-    review: AWAITING,
     sources: [S.nhsPreg, S.nhsTtc],
     sections: [
       { body: [
@@ -169,15 +161,14 @@ export const ARTICLES: Article[] = [
     slug: 'due-date-explained',
     category: 'pregnancy',
     title: 'How a due date is estimated',
-    summary: 'A due date is an estimate. An ultrasound or your clinician’s date is more accurate.',
+    summary: 'A due date is an estimate. An ultrasound or the date from your doctor or midwife is more accurate.',
     minutes: 3,
     drafted: '2026-10-22',
-    review: AWAITING,
     sources: [S.acogDue, S.nhsPreg],
     sections: [
       { body: [
         'The classic estimate adds 280 days (40 weeks) to the first day of your last period. This assumes ovulation around day 14, so Ondessa adjusts it slightly when your usual cycle is shorter or longer.',
-        'An early ultrasound is considered more accurate. If your clinician gives you a due date, enter it in Ondessa and it will replace the period-based estimate.',
+        'An early ultrasound is considered more accurate. If your doctor or midwife gives you a due date, enter it in Ondessa and it will replace the period-based estimate.',
         'Only a small share of babies arrive on the due date itself. Birth between 37 and 42 weeks is common.',
       ] },
     ],
@@ -189,7 +180,6 @@ export const ARTICLES: Article[] = [
     summary: 'Some symptoms need prompt attention. If in doubt, call.',
     minutes: 2,
     drafted: '2026-10-22',
-    review: AWAITING,
     sources: [S.nhsUrgent, S.nhsPreg],
     sections: [
       { body: [
@@ -205,7 +195,6 @@ export const ARTICLES: Article[] = [
     summary: 'Cycles often become less predictable for several years before periods stop.',
     minutes: 3,
     drafted: '2026-10-22',
-    review: AWAITING,
     sources: [S.nhsPeri, S.nams],
     sections: [
       { body: [
@@ -214,7 +203,7 @@ export const ARTICLES: Article[] = [
         'Pregnancy is still possible during perimenopause.',
       ] },
       { heading: 'How Ondessa helps', body: [
-        'In perimenopause mode, Ondessa keeps predictions wide and honest, and focuses on helping you see your own changes over time, which can be useful to bring to a clinician.',
+        'In perimenopause mode, Ondessa keeps predictions wide and honest, and focuses on helping you see your own changes over time, which can be useful to bring to a doctor.',
       ] },
     ],
   },
@@ -225,13 +214,12 @@ export const ARTICLES: Article[] = [
     summary: 'Symptoms that reliably show up before your period, and ease after it starts.',
     minutes: 3,
     drafted: '2026-10-22',
-    review: AWAITING,
     sources: [S.nhsPms, S.acogCycle],
     sections: [
       { body: [
         'Premenstrual symptoms can include bloating, breast tenderness, headaches, mood changes, tiredness and cravings, typically in the week or two before a period.',
         'Logging for a few cycles is the most reliable way to see whether a symptom is linked to your cycle. Ondessa will show you a pattern only once it appears in most of your recent logged cycles, and will say how many.',
-        'If symptoms seriously affect your life, a clinician can help. Severe mood symptoms before periods can be a treatable condition called PMDD.',
+        'If symptoms seriously affect your life, a doctor can help. Severe mood symptoms before periods can be a treatable condition called PMDD.',
       ] },
     ],
   },
@@ -242,12 +230,11 @@ export const ARTICLES: Article[] = [
     summary: 'Cramping is common. Pain that stops you living your life is worth checking.',
     minutes: 2,
     drafted: '2026-10-22',
-    review: AWAITING,
     sources: [S.nhsPainful],
     sections: [
       { body: [
         'Cramping in the lower belly, sometimes spreading to the back and thighs, is common in the first days of a period.',
-        'See a clinician if pain is severe, gets worse over time, stops you from doing everyday things, or happens outside your period or during sex. Conditions such as endometriosis can be underdiagnosed.',
+        'See a doctor if pain is severe, gets worse over time, stops you from doing everyday things, or happens outside your period or during sex. Conditions such as endometriosis can be underdiagnosed.',
       ] },
     ],
   },
@@ -258,24 +245,21 @@ export const ARTICLES: Article[] = [
     summary: 'Many causes are harmless, but some changes deserve a conversation.',
     minutes: 2,
     drafted: '2026-10-22',
-    review: AWAITING,
     sources: [S.figo, S.nhsHeavy, S.nhsPeriods],
     sections: [
       { body: [
-        'Consider talking to a clinician if: you have had no period for 3 months and are not pregnant, breastfeeding or in menopause; your cycles are regularly shorter than 24 or longer than 38 days; bleeding lasts more than 8 days, or is heavy enough to soak through protection every hour or two; you bleed between periods or after sex; or you bleed after menopause.',
+        'Consider talking to a doctor if: you have had no period for 3 months and are not pregnant, breastfeeding or in menopause; your cycles are regularly shorter than 24 or longer than 38 days; bleeding lasts more than 8 days, or is heavy enough to soak through protection every hour or two; you bleed between periods or after sex; or you bleed after menopause.',
         'Seek urgent care for very heavy bleeding with dizziness or faintness, or sudden severe pain.',
       ] },
     ],
   },
 ];
 
-/** Review status of the week-by-week notes below, shown in the app and enforced by release:check. */
-export const PREGNANCY_WEEKS_REVIEW: Article['review'] = AWAITING;
 
-/** Week-by-week pregnancy notes, grouped. Awaiting clinical review (see header). */
+/** Week-by-week pregnancy notes, grouped. General information only. */
 export const PREGNANCY_WEEKS: { from: number; to: number; title: string; baby: string; you: string }[] = [
   { from: 0, to: 3, title: 'Before a positive test', baby: 'Pregnancy is counted from the first day of your last period, so the first two weeks happen before conception.', you: 'Many people do not know they are pregnant yet. Health services often recommend folic acid before and in early pregnancy.' },
-  { from: 4, to: 7, title: 'Early weeks', baby: 'The embryo implants and early structures, including the beginnings of the heart and neural tube, start to form.', you: 'Tiredness, nausea, breast tenderness and needing to pee more are common. This is a good time to contact a clinician or midwife to book care.' },
+  { from: 4, to: 7, title: 'Early weeks', baby: 'The embryo implants and early structures, including the beginnings of the heart and neural tube, start to form.', you: 'Tiredness, nausea, breast tenderness and needing to pee more are common. This is a good time to contact a doctor or midwife to book care.' },
   { from: 8, to: 13, title: 'Through the first trimester', baby: 'Major organs continue forming. By the end of this stage the fetus is a few centimetres long.', you: 'Nausea often begins to ease towards the end of this stage. A dating scan is commonly offered around now.' },
   { from: 14, to: 19, title: 'Early second trimester', baby: 'Growth speeds up and movements begin, though they may not be felt yet.', you: 'Many people feel more energetic. Some begin to feel first movements around 16 to 20 weeks.' },
   { from: 20, to: 27, title: 'Mid-pregnancy', baby: 'The fetus grows steadily and responds to sound. A detailed anatomy scan is commonly offered around 20 weeks.', you: 'Movements become more noticeable. Back ache and heartburn are common.' },

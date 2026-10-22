@@ -35,7 +35,7 @@ Don't reverse engineer, resell or misuse the app, or use it unlawfully.
 
 ## 5. Content
 
-Educational content is general information reviewed by qualified clinicians, not personal medical advice. Sources are listed with each article.
+Educational content is general information drawn from the listed sources. It has not been reviewed by a medical professional and is not personal medical advice. Sources are listed with each article.
 
 ## 6. Disclaimers and limitation of liability
 

@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link, navigate } from '../app/router';
 import { useStore } from '../app/store';
-import { ARTICLES, CATEGORIES, type Article } from '../content/library';
+import { ARTICLES, CATEGORIES } from '../content/library';
 import type { Goal } from '../engine';
 import { COMPANY } from '../content/company';
 import { activateToken, previewPassAvailable } from '../data/entitlement';
 import { isNative, openExternal, platform } from '../platform';
 import { loadProducts, purchase, restorePurchases, type StorePlan } from '../platform/purchases';
 import { scheduleTrialReminder } from '../platform/notifications';
-import { diffDays, forecast, formatLong, formatShort, localToday, phaseOn, pregnancyStatus, PHASE_COPY } from '../engine';
+import { diffDays, forecast, formatShort, localToday, phaseOn, pregnancyStatus, PHASE_COPY } from '../engine';
 import { tourData } from '../app/tour';
 import { ConfidenceBadge, DotRing, Icon, Mark, MedicalNote, PhasePill } from '../ui/components';
 
@@ -232,7 +232,7 @@ export function Plans() {
             <div className="stack" style={{ '--gap': '10px' } as React.CSSProperties}>
               <span className="eyebrow">Pregnancy · trimester {preg.trimester}</span>
               <span className="kicker-num" style={{ fontSize: '2.8rem' }}>Week {preg.week}{preg.day ? ` + ${preg.day}` : ''}</span>
-              <span className="small muted">Estimated due date {formatShort(preg.dueDate)}{preg.source === 'clinician' ? ', from your clinician' : ', from your last period'}. Week-by-week notes, appointments and a symptom journal are ready.</span>
+              <span className="small muted">Estimated due date {formatShort(preg.dueDate)}{preg.source === 'clinician' ? ', from your doctor or midwife' : ', from your last period'}. Week-by-week notes, appointments and a symptom journal are ready.</span>
             </div>
           </section>
         )}
@@ -388,7 +388,7 @@ export function LibraryList({ base = '/library' }: { base?: string }) {
       <header className="stack" style={{ '--gap': '8px' } as React.CSSProperties}>
         <span className="eyebrow">Library</span>
         <h1 style={{ fontSize: 'clamp(1.8rem, 5vw, 2.6rem)' }}>Clear answers, with sources.</h1>
-        <p className="muted">General education, not personal medical advice. Every article lists its sources and its review status.</p>
+        <p className="muted">General education, not personal medical advice. Every article lists its sources.</p>
       </header>
       {CATEGORIES.map((c) => {
         const items = ARTICLES.filter((a) => a.category === c.id);
@@ -415,13 +415,6 @@ export function LibraryList({ base = '/library' }: { base?: string }) {
   );
 }
 
-export function ReviewBadge({ a }: { a: Article }) {
-  return a.review.status === 'reviewed' ? (
-    <span className="badge developing">Reviewed by {a.review.reviewer}, {a.review.credentials} · {formatLong(a.review.date)}</span>
-  ) : (
-    <span className="badge limited">Clinical review in progress</span>
-  );
-}
 
 export function ArticleView({ slug, base = '/library' }: { slug: string; base?: string }) {
   const a = ARTICLES.find((x) => x.slug === slug);
@@ -431,7 +424,6 @@ export function ArticleView({ slug, base = '/library' }: { slug: string; base?: 
       <Link to={base} className="btn ghost" ><Icon name="back" size={18} /> Library</Link>
       <span className="eyebrow">{CATEGORIES.find((c) => c.id === a.category)?.title} · {a.minutes} min read</span>
       <h1 style={{ fontSize: 'clamp(1.9rem, 5vw, 2.6rem)' }}>{a.title}</h1>
-      <div><ReviewBadge a={a} /></div>
       {a.sections.map((s, i) => (
         <section key={i}>
           {s.heading && <h2>{s.heading}</h2>}
@@ -446,7 +438,7 @@ export function ArticleView({ slug, base = '/library' }: { slug: string; base?: 
             <li key={s.url}><a href={s.url} target="_blank" rel="noopener noreferrer" onClick={(e) => { if (isNative) { e.preventDefault(); void openExternal(s.url); } }}>{s.label}</a></li>
           ))}
         </ol>
-        <p className="tiny faint">Drafted {formatLong(a.drafted)}. Opening a source leaves Ondessa; no personal data is sent with the link.</p>
+        <p className="tiny faint">General information, not medical advice. Opening a source leaves Ondessa; no personal data is sent with the link.</p>
       </section>
     </article>
   );

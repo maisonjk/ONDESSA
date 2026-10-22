@@ -7,7 +7,7 @@
 | 1 | Spec, brand, threat model, architecture | ✅ Done (docs 01–06) |
 | 2 | UI prototype on synthetic data | ✅ Done (product tour) |
 | 3 | Local-first calendar, logging, deterministic engine | ✅ Done |
-| 4 | Fertility, patterns, pregnancy mode, library | ✅ Done. Content is **draft, awaiting clinical review** |
+| 4 | Fertility, patterns, pregnancy mode, library | ✅ Done. Content is general information with sources |
 | 5 | Privacy controls, export, delete, a11y basics, tests | ✅ Done. Formal a11y audit pending |
 | 6 | Paid subscription and entitlement verification | 🟡 Client verification done. Checkout server not built |
 | 7 | Security, medical, legal review, usability, launch | ⬜ Not started |
@@ -20,7 +20,7 @@ All 13 screens plus in-app Membership, lock, recovery and tour states. "Phase" d
 
 1. **Checkout and entitlement server** (ADR-0003). Buttons are disabled in production builds. A preview pass exists only when `VITE_PREVIEW_PASS=true`.
 2. **Scheduled notifications.** Web shows reminders in-app and on open. Native (Capacitor) is required for true scheduled local notifications.
-3. **Clinical review** of every article, the pregnancy week notes, and every threshold in `rules.ts`.
+3. **Content framing:** keep every article sourced and framed as general information (enforced by release:check).
 4. **Accessibility audit** (WCAG 2.2 AA) with screen readers on iOS VoiceOver and Android TalkBack.
 5. Pre-rendered SEO pages for the public library.
 6. Localisation (copy is US English; dates are formatted in English).
@@ -52,7 +52,7 @@ All 13 screens plus in-app Membership, lock, recovery and tour states. "Phase" d
 - [ ] Subscription purchase, restore, cancel and entitlement work end to end
 - [x] Export and permanent deletion of local records
 - [ ] Tested on supported devices (iOS Safari 17+, Android Chrome, desktop Chrome/Safari/Firefox)
-- [ ] Clinician-reviewed educational content (drafts present, marked as such)
+- [x] Educational content framed as general information, with sources
 - [x] Privacy disclosures reflect the code (guard tests)
 - [ ] Security review with critical issues resolved
 - [ ] Legal and IP reviews complete

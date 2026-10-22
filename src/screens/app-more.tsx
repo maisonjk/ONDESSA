@@ -6,7 +6,7 @@ import { notificationPermission, requestNotificationPermission } from '../platfo
 import { manageSubscription, restorePurchases } from '../platform/purchases';
 import { Link, navigate } from '../app/router';
 import { useStore } from '../app/store';
-import { PREGNANCY_WEEKS_REVIEW, weekNotes } from '../content/library';
+import { weekNotes } from '../content/library';
 import { BackupNeedsPassword, makeBackup, readBackup } from '../data/backup';
 import { WrongPassphraseError } from '../data/crypto';
 import {
@@ -158,7 +158,7 @@ export function PregnancyView({ journal }: { journal?: React.ReactNode } = {}) {
   const lmpOk = !!lmp && lmp <= today && lmp >= addDays(today, -300);
   const datesForm = (label: string, apply: () => void) => (
     <div className="card stack" style={{ '--gap': '12px' } as React.CSSProperties}>
-      <div className="field"><label htmlFor="pdue">Due date from your clinician (most accurate)</label><input id="pdue" className="input" type="date" min={today} max={addDays(today, 280)} value={due} onChange={(e) => setDue(e.target.value)} /></div>
+      <div className="field"><label htmlFor="pdue">Due date from your doctor or midwife (most accurate)</label><input id="pdue" className="input" type="date" min={today} max={addDays(today, 280)} value={due} onChange={(e) => setDue(e.target.value)} /></div>
       {due && !dueOk && <p className="small" role="alert" style={{ color: 'var(--berry-ink)' }}>Choose a due date between today and 40 weeks from now.</p>}
       <div className="field"><label htmlFor="plmp">Or first day of your last period</label><input id="plmp" className="input" type="date" min={addDays(today, -300)} max={today} value={lmp} onChange={(e) => setLmp(e.target.value)} /></div>
       {lmp && !lmpOk && <p className="small" role="alert" style={{ color: 'var(--berry-ink)' }}>Choose a date in the last 43 weeks.</p>}
@@ -183,7 +183,7 @@ export function PregnancyView({ journal }: { journal?: React.ReactNode } = {}) {
   if (!st) {
     return (
       <div className="stack" style={{ '--gap': '16px', maxWidth: 640 } as React.CSSProperties}>
-        <PageTitle eyebrow="Pregnancy" title="Let’s update your dates">The dates saved for this pregnancy can’t be used to work out your week. Enter your clinician’s due date or your last period.</PageTitle>
+        <PageTitle eyebrow="Pregnancy" title="Let’s update your dates">The dates saved for this pregnancy can’t be used to work out your week. Enter the due date from your doctor or midwife, or your last period.</PageTitle>
         {datesForm('Save dates', () => update((d) => ({ ...d, pregnancy: { startedOn: p.startedOn, ...dates() } })))}
       </div>
     );
@@ -201,7 +201,7 @@ export function PregnancyView({ journal }: { journal?: React.ReactNode } = {}) {
         {st && (
           <>
             <div className="progress" style={{ background: 'color-mix(in oklab, var(--on-plum) 25%, transparent)' }}><i style={{ width: `${st.progress * 100}%`, background: 'var(--on-plum)' }} /></div>
-            <p className="small muted">Estimated due date {formatLong(st.dueDate)} · {st.pastDueDate ? 'past the estimated date' : `${st.daysToGo} days to go`} · {st.source === 'clinician' ? 'date from your clinician' : 'estimated from your last period'}</p>
+            <p className="small muted">Estimated due date {formatLong(st.dueDate)} · {st.pastDueDate ? 'past the estimated date' : `${st.daysToGo} days to go`} · {st.source === 'clinician' ? 'date from your doctor or midwife' : 'estimated from your last period'}</p>
           </>
         )}
       </section>
@@ -211,9 +211,7 @@ export function PregnancyView({ journal }: { journal?: React.ReactNode } = {}) {
       {notes && (
         <section className="card stack" style={{ '--gap': '10px' } as React.CSSProperties}>
           <span className="eyebrow">Weeks {notes.from}–{notes.to}</span>
-          <div className="row between wrap-row"><h3>{notes.title}</h3>{PREGNANCY_WEEKS_REVIEW.status === 'reviewed'
-            ? <span className="badge developing">Reviewed by {PREGNANCY_WEEKS_REVIEW.reviewer}, {PREGNANCY_WEEKS_REVIEW.credentials}</span>
-            : <span className="badge limited">Clinical review in progress</span>}</div>
+          <div className="row between wrap-row"><h3>{notes.title}</h3></div>
           <p className="small"><strong>Baby:</strong> {notes.baby}</p>
           <p className="small"><strong>You:</strong> {notes.you}</p>
           <p className="tiny faint">General information for weeks {notes.from}–{notes.to}. Every pregnancy is different.</p>

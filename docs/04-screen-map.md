@@ -40,7 +40,7 @@ System states: Loading · Lock screen (passcode) · Storage unavailable (recover
 
 **Recap:** Insights → Last cycle recap: length, period, days logged and the prediction recomputed as of the day before the period, scored against the actual start. Symptoms are off by default.
 
-**Pregnancy:** Settings life stage, or You → Pregnancy → clinician due date or LMP → Pregnancy mode. Cycle reminders pause and history is kept. End mode → archived to `pastPregnancies`.
+**Pregnancy:** Settings life stage, or You → Pregnancy → due date from a doctor or midwife, or LMP → Pregnancy mode. Cycle reminders pause and history is kept. End mode → archived to `pastPregnancies`.
 
 **Delete:** Privacy center → type DELETE → database, keys and caches removed → re-check → `/deleted` with verified status.
 

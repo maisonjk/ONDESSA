@@ -154,14 +154,14 @@ export function Onboarding() {
             <span className="eyebrow">Dating your pregnancy</span>
             <h1 style={{ fontSize: 'clamp(1.8rem, 6vw, 2.4rem)' }}>Let’s find your week.</h1>
             <div className="field">
-              <label htmlFor="due">Due date from your clinician (most accurate)</label>
+              <label htmlFor="due">Due date from your doctor or midwife (most accurate)</label>
               <input id="due" className="input" type="date" min={today} max={addDays(today, 280)} value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
             </div>
             <div className="field">
               <label htmlFor="lmp">Or the first day of your last period</label>
               <input id="lmp" className="input" type="date" max={today} min={addDays(today, -300)} value={lastStart} onChange={(e) => setLastStart(e.target.value)} />
             </div>
-            <p className="small muted">A clinician-provided date always takes priority. Ondessa’s calendar is for information and is not a substitute for prenatal care.</p>
+            <p className="small muted">A date from your doctor or midwife always takes priority. Ondessa’s calendar is for information and is not a substitute for prenatal care.</p>
             <button className="btn block" disabled={!dateOk} onClick={() => setStep(3)}>Continue</button>
           </>
         )}
