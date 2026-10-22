@@ -16,6 +16,16 @@ export const PRICES = {
   annual: { amount: 59.99, label: '$59.99', per: 'per year' },
 } as const;
 
+/** What a member gets, framed as outcomes. Shown before any price on the plans screen. */
+const BENEFITS: [string, string][] = [
+  ['Know what’s coming', 'Period and fertile-window predictions that show how sure they are, and get sharper every cycle.'],
+  ['Understand your body', 'My Cycle, My Patterns links your symptoms, mood and energy to your own cycle. Never generic averages.'],
+  ['Trying to conceive', 'Best days with the honest range, plus optional LH, temperature and mucus tracking.'],
+  ['Pregnancy, week by week', 'A calm calendar, appointment reminders and space to note how you feel.'],
+  ['Irregular or changing cycles', 'Perimenopause and irregular-cycle support that stays honest when patterns shift.'],
+  ['Private, for real', 'No account, no ads, no data sold. Passcode encryption, encrypted backups, delete anytime.'],
+];
+
 export function PublicShell({ children }: { children: React.ReactNode }) {
   const { data, entitlement, tour } = useStore();
   const inApp = data && !tour && entitlement.status === 'active';
@@ -129,14 +139,11 @@ export function Landing() {
         </section>
 
         <section className="wrap center stack" style={{ '--gap': '14px', alignItems: 'center' } as React.CSSProperties}>
-          <h2 style={{ maxWidth: '20ch' }}>Simple pricing. No free tier, no ads, no selling data.</h2>
-          <p className="muted" style={{ maxWidth: '52ch' }}>Your subscription is the whole business model. That’s what lets us say no to the rest.</p>
-          <div className="row wrap-row" style={{ justifyContent: 'center' }}>
-            <span className="serif" style={{ fontSize: '1.4rem' }}>$8.99 / month</span>
-            <span className="faint">or</span>
-            <span className="serif" style={{ fontSize: '1.4rem' }}>$59.99 / year</span>
-          </div>
-          <button className="btn" onClick={() => navigate('/plans')}>See plans</button>
+          <span className="eyebrow">Membership</span>
+          <h2 style={{ maxWidth: '22ch' }}>A tracker that works <em>for you</em>, not for advertisers.</h2>
+          <p className="muted" style={{ maxWidth: '54ch' }}>No ads, no data deals, no account. Members fund Ondessa directly, so every feature is built around your body and your privacy.</p>
+          <button className="btn" onClick={() => navigate('/plans')}>See what’s included</button>
+          <p className="small faint">From $59.99 a year, or $8.99 monthly. Cancel anytime.</p>
         </section>
       </div>
     </PublicShell>
@@ -172,7 +179,7 @@ export function Plans() {
         <div className="stack center" style={{ '--gap': '10px', alignItems: 'center' } as React.CSSProperties}>
           <span className="eyebrow">Ondessa membership</span>
           <h1 style={{ fontSize: 'clamp(2rem, 5vw, 2.8rem)' }}>
-            {pregnant ? 'Your pregnancy calendar is ready.' : hasPrediction ? 'Your first prediction is ready.' : mine ? 'You’re set up.' : 'Choose your plan'}
+            {pregnant ? 'Your pregnancy calendar is ready.' : hasPrediction ? 'Your first prediction is ready.' : mine ? 'You’re set up.' : 'Your cycle, understood. Privately.'}
           </h1>
           <p className="muted" style={{ maxWidth: '50ch' }}>
             {mine && !hasPrediction
@@ -193,27 +200,27 @@ export function Plans() {
           </section>
         )}
 
-        <div className="price-grid">
-          {(['annual', 'monthly'] as const).map((p) => (
-            <button key={p} type="button" className={`card plan stack ${plan === p ? 'selected' : ''}`} style={{ '--gap': '8px', textAlign: 'left', cursor: 'pointer' } as React.CSSProperties} onClick={() => setPlan(p)} aria-pressed={plan === p}>
-              <div className="row between"><span className="eyebrow">{p === 'annual' ? 'Yearly' : 'Monthly'}</span>{p === 'annual' && <span className="badge established">Save {saving}% vs monthly</span>}</div>
-              <span className="price">{priceOf(p)}</span>
-              <span className="small muted">{PRICES[p].per}{p === 'annual' && !storePrices.annual ? ` · about $${(PRICES.annual.amount / 12).toFixed(2)} a month` : ''}</span>
-              <span className="tiny faint">Renews automatically at {priceOf(p)} {PRICES[p].per} until you cancel.</span>
-            </button>
+        <section className="benefits" aria-label="What membership includes">
+          {BENEFITS.map(([t, d]) => (
+            <div key={t} className="benefit">
+              <strong>{t}</strong>
+              <span className="small muted">{d}</span>
+            </div>
           ))}
-        </div>
+        </section>
 
-        <div className="card stack" style={{ '--gap': '12px' } as React.CSSProperties}>
-          <h3>Included</h3>
-          <ul className="small muted stack" style={{ '--gap': '6px', paddingLeft: 18 } as React.CSSProperties}>
-            <li>Cycle predictions with transparent confidence levels</li>
-            <li>Fertile-window estimates with optional LH, temperature and mucus logging</li>
-            <li>My Cycle, My Patterns personal insights</li>
-            <li>Pregnancy mode with week-by-week calendar and appointment reminders</li>
-            <li>Perimenopause and irregular-cycle support</li>
-            <li>Passcode encryption, encrypted backups, export and permanent deletion</li>
-          </ul>
+        <div className="stack" style={{ '--gap': '10px' } as React.CSSProperties}>
+          <span className="eyebrow center">Choose how you’d like to pay</span>
+          <div className="price-grid">
+            {(['annual', 'monthly'] as const).map((p) => (
+              <button key={p} type="button" className={`card plan stack ${plan === p ? 'selected' : ''}`} style={{ '--gap': '6px', textAlign: 'left', cursor: 'pointer' } as React.CSSProperties} onClick={() => setPlan(p)} aria-pressed={plan === p}>
+                <div className="row between"><span className="eyebrow">{p === 'annual' ? 'Yearly' : 'Monthly'}</span>{p === 'annual' && <span className="badge established">Best value · save {saving}%</span>}</div>
+                <span className="price">{priceOf(p)}<small>{PRICES[p].per}</small></span>
+                <span className="small muted">{p === 'annual' ? (storePrices.annual ? 'One payment covers the whole year.' : `Works out to about $${(PRICES.annual.amount / 12).toFixed(2)} a month.`) : 'Flexible. Stop whenever you like.'}</span>
+                <span className="tiny faint">Renews automatically at {priceOf(p)} {PRICES[p].per} until you cancel.</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {active ? (
@@ -353,7 +360,7 @@ export function ReviewBadge({ a }: { a: Article }) {
   return a.review.status === 'reviewed' ? (
     <span className="badge developing">Reviewed by {a.review.reviewer}, {a.review.credentials} · {formatLong(a.review.date)}</span>
   ) : (
-    <span className="badge limited">Draft · awaiting clinical review</span>
+    <span className="badge limited">Clinical review in progress</span>
   );
 }
 

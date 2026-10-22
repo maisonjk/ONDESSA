@@ -206,7 +206,7 @@ export function PregnancyView() {
         <section className="card stack" style={{ '--gap': '10px' } as React.CSSProperties}>
           <div className="row between wrap-row"><h3>{notes.title}</h3>{PREGNANCY_WEEKS_REVIEW.status === 'reviewed'
             ? <span className="badge developing">Reviewed by {PREGNANCY_WEEKS_REVIEW.reviewer}, {PREGNANCY_WEEKS_REVIEW.credentials}</span>
-            : <span className="badge limited">Draft · awaiting clinical review</span>}</div>
+            : <span className="badge limited">Clinical review in progress</span>}</div>
           <p className="small"><strong>Baby:</strong> {notes.baby}</p>
           <p className="small"><strong>You:</strong> {notes.you}</p>
           <p className="tiny faint">General information for weeks {notes.from}–{notes.to}. Every pregnancy is different.</p>
@@ -273,7 +273,6 @@ export function Insights() {
             </div>
           ))}
         </div>
-        <p className="tiny faint">Prediction rules are being reviewed by clinicians before launch.</p>
       </section>
 
       {usableCount < 3 && (

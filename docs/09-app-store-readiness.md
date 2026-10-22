@@ -113,3 +113,7 @@ npx cap open android          # Android Studio
 - Purchase entitlement is checked on the device until receipt validation is added (step 8).
 - iCloud device backups can include app data (disclosed in the privacy policy). Passcode-encrypted data stays encrypted.
 - A 4–6 digit passcode protects against casual access. It does not protect against forensic attacks (see ADR-0005). Face ID unlock uses the keychain on this device only.
+
+## Submission kit
+
+Screenshots, listing text, form answers and review notes are in `store/README.md`. Listing text is in `fastlane/metadata/`. Regenerate screenshots with `npm run store:assets`.

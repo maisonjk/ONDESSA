@@ -14,7 +14,8 @@
     "licenses": "node scripts/license-inventory.mjs",
     "release:check": "node scripts/release-check.mjs",
     "build:native": "vite build && cap sync",
-    "test:e2e": "node e2e/run.cjs --serve"
+    "test:e2e": "node e2e/run.cjs --serve",
+    "store:assets": "bash scripts/store/run.sh"
   },
   "dependencies": {
     "@aparajita/capacitor-biometric-auth": "10.0.0",

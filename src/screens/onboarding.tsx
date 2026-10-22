@@ -84,7 +84,7 @@ export function Onboarding() {
             </div>
             <p className="small muted">Because your data lives only here, losing this device without a backup means losing your history. You can create an encrypted backup anytime.</p>
             <button className="btn block" onClick={() => setStep(1)}>I understand, continue</button>
-            <p className="small muted center">Setup is free and stays on this device. Predictions need a membership: $59.99 a year or $8.99 a month.</p>
+            <p className="small muted center">Setup is free and stays on this device. You’ll see your first prediction before choosing a membership.</p>
             <RestoreBackup />
           </>
         )}
