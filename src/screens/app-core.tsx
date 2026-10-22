@@ -7,8 +7,9 @@ import {
   upcomingReminders, MOODS, SYMPTOMS,
   type DayLog, type Flow, type ISODate, type Level, type Mucus, type Symptom,
 } from '../engine';
+import { PregnancyView } from './app-more';
 import {
-  ConfidenceBadge, DotRing, EvidenceStrip, Icon, Mark, MedicalNote, PageTitle, PhasePill, Toast,
+  ConfidenceBadge, DotRing, EvidenceStrip, Icon, Mark, MedicalNote, PhasePill, Toast,
 } from '../ui/components';
 
 const TABS = [
@@ -29,10 +30,10 @@ export function openLog(section?: string) {
   navigate('/app/log');
 }
 
-export function AppShell({ path, children }: { path: string; children: React.ReactNode }) {
+export function AppShell({ path, children, limited = false }: { path: string; children: React.ReactNode; limited?: boolean }) {
   const { tour, exitTour, today, storageError, notice, selectDate } = useStore();
   return (
-    <div className="app">
+    <div className={`app${limited ? ' limited' : ''}`}>
       {tour && (
         <div className="tour-banner">
           <div className="wrap">
@@ -51,9 +52,16 @@ export function AppShell({ path, children }: { path: string; children: React.Rea
         </div>
       </header>
       {storageError && <div className="wrap" style={{ paddingTop: 12 }}><div className="callout" role="alert">{storageError}</div></div>}
+      {limited && (
+        <div className="wrap" style={{ paddingTop: 12 }}>
+          <div className="callout" role="note">
+            Your membership isn’t active, but your data is still yours: back it up, export it or delete it here. <Link to="/plans">See plans</Link>
+          </div>
+        </div>
+      )}
       <main className="wrap main">{children}</main>
       <Toast msg={notice} />
-      <div className="tabbar">
+      {!limited && <div className="tabbar">
         <nav aria-label="Main">
           {TABS.map((t) => {
             const current = t.to === '/app' ? path === '/app' : t.to === '/app/you' ? YOU_PATHS.some((p) => path.startsWith(p)) : path.startsWith(t.to);
@@ -65,7 +73,7 @@ export function AppShell({ path, children }: { path: string; children: React.Rea
             );
           })}
         </nav>
-      </div>
+      </div>}
     </div>
   );
 }
@@ -113,7 +121,7 @@ export function Home() {
   }
 
   const heads = headsUp(f, insights, today);
-  const topInsight = insights.find((i) => i.kind !== 'data' && (!heads || i.symptom !== heads.symptom)) ?? (heads ? undefined : insights[0]);
+  const topInsight = insights.find((i) => i.kind !== 'data' && (!heads || i.symptom !== heads.symptom)) ?? (heads || !f.lastPeriod ? undefined : insights[0]);
   const reminders = upcomingReminders(data, f, today, 21).filter((r) => r.id !== 'daily-log').slice(0, 3);
   const todayLog = data.logs[today];
   const fertileWin = upcomingFertileWindow(f);
@@ -131,6 +139,7 @@ export function Home() {
             <h1 className="big-caption">{big ? <span className="sr-only">{big} </span> : null}{caption}</h1>
           </div>
           <p className="muted" style={{ maxWidth: '38ch' }}>{detail}</p>
+          {late && <Link to="/app/library/when-to-test" className="small" >When a pregnancy test is most reliable →</Link>}
           <div className="row wrap-row" style={{ '--gap': '8px' } as React.CSSProperties}>
             <ConfidenceBadge level={f.confidence} />
             {f.irregular && <span className="badge">Wider window</span>}
@@ -144,7 +153,7 @@ export function Home() {
         </div>
         <div className="stack" style={{ '--gap': '10px', alignItems: 'center' } as React.CSSProperties}>
           <DotRing f={f} showFertility={showFertility} />
-          <div className="legend" style={{ justifyContent: 'center' }}>
+          <div className="legend legend-grid">
             <span><i style={{ background: 'var(--berry)' }} />Period</span>
             <span><i style={{ background: 'var(--apricot)' }} />Follicular</span>
             {showFertility && <span><i style={{ background: 'var(--sage)' }} />Fertile (est.)</span>}
@@ -178,17 +187,17 @@ export function Home() {
             <span className="tiny faint mono">{formatShort(today).toUpperCase()}</span>
           </div>
           <LogTiles />
-          <QuickLog showFlow={showFlowFirst(f, today)} />
+          <QuickLog showFlow={showFlowFirst(f, today)} highlight={heads?.symptom} />
           <p className="small faint">{todayLog ? summarizeLog(todayLog, data.settings.temperatureUnit) : 'Nothing logged yet. One tap saves on this device.'}</p>
         </section>
 
         {topInsight && (
           <Link to="/app/insights" className="card tint-sage stack span-3" >
-            <span className="eyebrow" style={{ color: 'var(--sage-ink)' }}>My Cycle, My Patterns</span>
+            <span className="eyebrow" style={{ color: 'var(--sage-ink)' }}>Insights · from your logs</span>
             <h3 style={{ fontSize: '1.35rem' }}>{topInsight.title}</h3>
             <p className="small">{topInsight.body}</p>
             <p className="tiny muted">{topInsight.limitation}</p>
-            <span className="small" style={{ fontWeight: 560, marginTop: 'auto' }}>All patterns →</span>
+            <span className="small" style={{ fontWeight: 560, marginTop: 'auto' }}>All insights →</span>
           </Link>
         )}
 
@@ -205,7 +214,7 @@ export function Home() {
             <span className="eyebrow">Coming up</span>
             {reminders.map((r) => (
               <div key={r.id} className="row between small" style={{ padding: '6px 0' }}>
-                <span>{r.title}</span><span className="faint mono tiny" style={{ whiteSpace: 'nowrap' }}>{r.date === today ? 'TODAY' : `REMIND ${formatShort(r.date).toUpperCase()}`}</span>
+                <span>{r.title}</span><span className="faint mono tiny" style={{ whiteSpace: 'nowrap' }}>{r.date === today ? 'REMINDER TODAY' : `REMINDER ${formatShort(r.date).toUpperCase()}`}</span>
               </div>
             ))}
           </section>
@@ -270,7 +279,7 @@ function WeekStrip() {
             >
               <span className="wd">{letters[weekday(d)]}</span>{' '}
               <span className="dn">{Number(d.slice(8))}</span>
-              <span className="sr-only">, {formatLong(d)}{ph ? `, ${PHASE_COPY[ph].label}${future ? ' (estimate)' : ''}` : ''}</span>
+              <span className="sr-only"> {formatLong(d)}{ph ? `. ${PHASE_COPY[ph].label}${future && !PHASE_COPY[ph].label.includes('estimate') ? ' (estimate)' : ''}` : ''}</span>
               <span className={`pd ${ph ? (future ? 'predicted' : '') : 'none'}`} />
             </button>
           );
@@ -303,20 +312,32 @@ function showFlowFirst(f: NonNullable<ReturnType<typeof useStore>['forecast']>, 
 }
 
 /** One-tap logging for today: flow around periods, otherwise the user's most-logged symptoms and mood. */
-function QuickLog({ showFlow }: { showFlow: boolean }) {
+function QuickLog({ showFlow, highlight }: { showFlow: boolean; highlight?: Symptom }) {
   const { data, setLog, today, notify } = useStore();
   if (!data) return null;
   const log = data.logs[today] ?? { date: today };
-  if (showFlow) return <QuickFlow date={today} />;
-  const counts = new Map<Symptom, number>();
-  for (const l of Object.values(data.logs)) for (const x of l.symptoms ?? []) counts.set(x, (counts.get(x) ?? 0) + 1);
-  const top = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([x]) => x);
-  const symptoms = [...new Set([...top, 'cramps', 'headache', 'bloating', 'fatigue'] as Symptom[])].slice(0, 4);
   const toggle = (x: Symptom) => {
     const on = !!log.symptoms?.includes(x);
     setLog({ ...log, symptoms: on ? log.symptoms!.filter((y) => y !== x) : [...(log.symptoms ?? []), x] });
     notify(on ? 'Removed' : `Logged ${x}`);
   };
+  // Around a period, flow comes first; a heads-up symptom stays one tap away too.
+  if (showFlow) {
+    return (
+      <div className="stack" style={{ '--gap': '10px' } as React.CSSProperties}>
+        <QuickFlow date={today} />
+        {highlight && (
+          <div className="chips" role="group" aria-label="Quick symptoms">
+            <button type="button" className="chip" aria-pressed={!!log.symptoms?.includes(highlight)} onClick={() => toggle(highlight)}>{highlight}</button>
+          </div>
+        )}
+      </div>
+    );
+  }
+  const counts = new Map<Symptom, number>();
+  for (const l of Object.values(data.logs)) for (const x of l.symptoms ?? []) counts.set(x, (counts.get(x) ?? 0) + 1);
+  const top = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([x]) => x);
+  const symptoms = [...new Set([...(highlight ? [highlight] : []), ...top, 'cramps', 'headache', 'bloating', 'fatigue'] as Symptom[])].slice(0, 4);
   return (
     <div className="stack" style={{ '--gap': '10px' } as React.CSSProperties}>
       <div className="chips" role="group" aria-label="Quick symptoms">
@@ -334,6 +355,28 @@ function QuickLog({ showFlow }: { showFlow: boolean }) {
 const FLOWS: { v: Flow; label: string }[] = [
   { v: 'spotting', label: 'Spotting' }, { v: 'light', label: 'Light' }, { v: 'medium', label: 'Medium' }, { v: 'heavy', label: 'Heavy' },
 ];
+
+/**
+ * Pregnancy: bleeding is a warning sign, not a period. It's stored as spotting so it never
+ * starts a cycle, and logging it always points to medical help.
+ */
+function PregnancyBleeding({ date }: { date: ISODate }) {
+  const { data, setLog } = useStore();
+  const log = data?.logs[date] ?? { date };
+  const on = !!log.flow;
+  return (
+    <div className="stack" style={{ '--gap': '10px' } as React.CSSProperties}>
+      <div className="chips" role="group" aria-label="Spotting or bleeding">
+        <button type="button" className="chip berry" aria-pressed={on} onClick={() => setLog({ ...log, flow: on ? undefined : 'spotting' })}>Spotting or bleeding</button>
+      </div>
+      {on && (
+        <p className="small" role="note" style={{ color: 'var(--berry-ink)' }}>
+          Bleeding in pregnancy should be checked. Contact your midwife or doctor, or emergency services if it’s heavy or you have pain. <Link to="/app/library/pregnancy-when-to-call">When to call</Link>
+        </p>
+      )}
+    </div>
+  );
+}
 
 function QuickFlow({ date }: { date: ISODate }) {
   const { data, setLog, notify } = useStore();
@@ -366,6 +409,9 @@ export function Calendar() {
     return data.pregnancy && k !== 'period' && k !== 'spotting' ? 'none' : k;
   };
   const kind = kindOf(selectedDate);
+  const pst = data.pregnancy ? pregnancyStatus(data.pregnancy, selectedDate, data.settings.cycle.typicalCycleLength) : undefined;
+  const pregWeek = pst ? `Pregnancy week ${pst.week}${pst.day ? ` + ${pst.day}` : ''}` : undefined;
+  const apptOn = data.appointments.filter((a) => a.date === selectedDate);
   const kindLabel: Record<string, string> = {
     period: 'Period (logged)', spotting: 'Spotting (logged)', 'predicted-period': 'Predicted period',
     'possible-period': 'Period possible (expected window)', fertile: 'Estimated fertile window', ovulation: 'Estimated ovulation day', none: '',
@@ -385,7 +431,7 @@ export function Calendar() {
           {grid.map((d) => {
             const k = kindOf(d);
             const l = data.logs[d];
-            const hasDetails = !!(l && (l.symptoms?.length || l.mood || l.note || l.lh || l.bbt || l.mucus));
+            const hasDetails = !!(l && (l.symptoms?.length || l.mood || l.note || l.lh || l.bbt || l.mucus)) || (!!data.pregnancy && data.appointments.some((a) => a.date === d));
             const cls = ['day', k !== 'none' ? k : '', d.startsWith(monthPrefix) ? '' : 'out', d === today ? 'today' : '', d === selectedDate ? 'selected' : ''].join(' ');
             return (
               <button key={d} type="button" className={cls} onClick={() => selectDate(d)} aria-label={`${formatLong(d)}${kindLabel[k] ? `, ${kindLabel[k]}` : ''}${hasDetails ? ', has notes' : ''}`} aria-pressed={d === selectedDate}>
@@ -396,12 +442,20 @@ export function Calendar() {
           })}
         </div>
         <div className="legend" style={{ marginTop: 16, padding: '0 8px 8px' }}>
-          <span><i style={{ background: 'var(--berry)' }} />Logged period</span>
-          <span><i style={{ boxShadow: 'inset 0 0 0 1.5px var(--berry)' }} />Most likely</span>
-          <span><i style={{ boxShadow: 'inset 0 0 0 1.5px var(--berry)', opacity: 0.45 }} />Possible</span>
+          {data.pregnancy ? (
+            <>
+              <span><i style={{ boxShadow: 'inset 0 0 0 2px var(--berry)' }} />Spotting or bleeding logged</span>
+            </>
+          ) : (
+            <>
+              <span><i style={{ background: 'var(--berry)' }} />Logged period</span>
+              <span><i style={{ boxShadow: 'inset 0 0 0 1.5px var(--berry)' }} />Most likely</span>
+              <span><i style={{ boxShadow: 'inset 0 0 0 1.5px var(--berry)', opacity: 0.45 }} />Possible</span>
+            </>
+          )}
           {data.settings.showFertility && !data.pregnancy && <span><i style={{ background: 'var(--sage-soft)', boxShadow: 'inset 0 0 0 1px var(--sage)' }} />Fertile estimate</span>}
           {data.settings.showFertility && !data.pregnancy && <span><i style={{ background: 'var(--sage-ink)' }} />Est. ovulation</span>}
-          <span><i style={{ background: 'var(--gold)' }} />Has notes</span>
+          <span><i style={{ background: 'var(--gold)' }} />{data.pregnancy ? 'Notes or appointment' : 'Has notes'}</span>
         </div>
       </section>
 
@@ -409,12 +463,13 @@ export function Calendar() {
         <div className="row between">
           <div>
             <h3>{formatLong(selectedDate)}</h3>
-            {kindLabel[kind] && <span className="small muted">{kindLabel[kind]}</span>}
+            {pregWeek ? <span className="small muted">{pregWeek}{apptOn.length ? ` · ${apptOn.map((a) => a.title).join(', ')}` : ''}</span>
+              : kindLabel[kind] && <span className="small muted">{kindLabel[kind]}</span>}
           </div>
           {selectedDate <= today && <button className="btn" onClick={() => navigate('/app/log')}>{sel ? 'Edit' : 'Log'}</button>}
         </div>
         {sel ? <p className="small muted">{summarizeLog(sel, data.settings.temperatureUnit)}</p> : <p className="small faint">{selectedDate > today ? 'Future dates show estimates only.' : 'Nothing logged.'}</p>}
-        {selectedDate <= today && <QuickFlow date={selectedDate} />}
+        {selectedDate <= today && (data.pregnancy ? <PregnancyBleeding date={selectedDate} /> : <QuickFlow date={selectedDate} />)}
       </section>
       {f.nextPeriod && !data.pregnancy && (
         <p className="small faint">Predictions further ahead are less certain. Each later cycle’s window widens by a day.</p>
@@ -465,6 +520,11 @@ export function LogDay() {
         <button className="btn ghost" aria-label="Next day" disabled={date >= today} onClick={() => selectDate(addDays(date, 1))}><Icon name="chevron" /></button>
       </div>
 
+      {data.pregnancy && (
+        <LogSection id="log-flow" title="Spotting or bleeding">
+          <PregnancyBleeding date={date} />
+        </LogSection>
+      )}
       {!data.pregnancy && (
         <LogSection id="log-flow" title="Bleeding">
           <div className="chips">
@@ -537,10 +597,7 @@ export function LogDay() {
       )}
 
       <LogSection title="Note">
-        <textarea
-          key={date} className="input" maxLength={2000} defaultValue={log.note ?? ''} aria-label="Private note" placeholder="Anything you want to remember. Stays on this device."
-          onChange={(e) => set({ note: e.target.value.trim() ? e.target.value : undefined })}
-        />
+        <NoteField key={date} initial={log.note ?? ''} onChange={(v) => set({ note: v.trim() ? v : undefined })} />
       </LogSection>
 
       <div className="saved-bar">
@@ -550,6 +607,25 @@ export function LogDay() {
         </span>
         <button className="btn" onClick={() => { showToast('Saved on this device'); navigate('/app'); }}>Done</button>
       </div>
+    </div>
+  );
+}
+
+const NOTE_MAX = 2000;
+
+/** Private note with a visible limit, so nothing is cut off without warning. */
+function NoteField({ initial, onChange }: { initial: string; onChange: (v: string) => void }) {
+  const [len, setLen] = useState(initial.length);
+  const near = len >= NOTE_MAX - 200;
+  return (
+    <div className="stack" style={{ '--gap': '6px' } as React.CSSProperties}>
+      <textarea
+        className="input" maxLength={NOTE_MAX} defaultValue={initial} aria-label="Private note" aria-describedby="note-count" placeholder="Anything you want to remember. Stays on this device."
+        onChange={(e) => { setLen(e.target.value.length); onChange(e.target.value); }}
+      />
+      <span id="note-count" className={`tiny ${near ? '' : 'faint'}`} style={near ? { color: 'var(--berry-ink)' } : undefined} aria-live={near ? 'polite' : 'off'}>
+        {len >= NOTE_MAX ? `Limit reached: notes can be up to ${NOTE_MAX} characters.` : `${len} / ${NOTE_MAX}`}
+      </span>
     </div>
   );
 }
@@ -586,16 +662,13 @@ function Scale({ label, value, onChange, lowHigh = ['Low', 'High'] }: { label: s
 /* ------------------------------------------------------------------ Pregnancy home (used by Home) */
 
 function PregnancyHome() {
-  const { data, today } = useStore();
-  if (!data?.pregnancy) return null;
-  const st = pregnancyStatus(data.pregnancy, today, data.settings.cycle.typicalCycleLength);
   return (
-    <div className="stack" style={{ '--gap': '18px' } as React.CSSProperties}>
-      <PageTitle eyebrow="Pregnancy" title={st ? `Week ${st.week}${st.day ? ` + ${st.day}` : ''}` : 'Pregnancy mode'}>
-        {st ? `Estimated due date ${formatLong(st.dueDate)}${st.source === 'clinician' ? ' (from your clinician)' : ' (from your last period)'}.` : 'Add a due date or last period date to see your week.'}
-      </PageTitle>
-      <Link to="/app/pregnancy" className="btn">Open pregnancy calendar</Link>
-      <div className="callout">For any medical concern in pregnancy, contact your midwife, doctor or local emergency services. Ondessa cannot assess symptoms.</div>
-    </div>
+    <PregnancyView journal={
+      <section className="card stack" style={{ '--gap': '12px' } as React.CSSProperties}>
+        <div className="row between"><h3>Today’s journal</h3><Link to="/app/log" className="btn ghost">Open full log</Link></div>
+        <LogTiles />
+        <p className="small faint">Symptoms, mood and sleep stay private on this device.</p>
+      </section>
+    } />
   );
 }

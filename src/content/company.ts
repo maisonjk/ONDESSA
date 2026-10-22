@@ -8,7 +8,7 @@ export const COMPANY = {
   /** Legal entity that publishes the app, e.g. "Ondessa Health LLC". */
   legalName: '',
   /** Support inbox shown in Help and in the store listings. */
-  supportEmail: '',
+  supportEmail: 'innerlink24@gmail.com',
   /** Public URLs for the store listings (the web build serves these pages). */
   privacyPolicyUrl: '',
   termsUrl: '',

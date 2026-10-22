@@ -26,3 +26,11 @@ Ondessa does not claim to be breach-proof, anonymous, HIPAA-compliant, or certif
 ## Logging policy
 
 Application code never calls `console.*` (enforced by test). The static host keeps standard access logs with IP, path (screen names only, since hash routes never reach the server) and user agent. Retention should be set to the minimum the host allows.
+
+## Unfinished setup
+
+While setup is in progress, the answers (goal, dates, lengths, display choices; never the passcode) are kept in `sessionStorage` under `ondessa.setupDraft` so a reload or a WebView restart doesn't lose them. The draft is unencrypted, lives only for that browser session, and is deleted when setup finishes, when a backup is restored, when setup is closed, and by Delete everything.
+
+## Access without a membership
+
+Privacy center and Membership stay reachable when a membership is missing, expired or refunded, so people can always back up, export or delete their own data. Every other app screen redirects to Plans.

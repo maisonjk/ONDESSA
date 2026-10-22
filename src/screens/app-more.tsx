@@ -141,8 +141,13 @@ function TestDatePicker({ suggested }: { suggested?: string }) {
 
 /* ------------------------------------------------------------------ Pregnancy */
 
-export function PregnancyView() {
+/**
+ * Pregnancy dashboard. Also rendered on Today in pregnancy mode, where `journal` replaces
+ * the journal card with one-tap log tiles.
+ */
+export function PregnancyView({ journal }: { journal?: React.ReactNode } = {}) {
   const { data, update, today } = useStore();
+  const [ending, setEnding] = useState(false);
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
   const [lmp, setLmp] = useState('');
@@ -184,8 +189,8 @@ export function PregnancyView() {
     );
   }
   const endPregnancy = () => {
-    if (!window.confirm('End pregnancy mode? Your pregnancy details are kept in your history, and cycle tracking resumes.')) return;
     update((d) => ({ ...d, pregnancy: undefined, pastPregnancies: [...d.pastPregnancies, p], settings: { ...d.settings, goal: 'understand' } }));
+    setEnding(false);
   };
 
   return (
@@ -205,6 +210,7 @@ export function PregnancyView() {
 
       {notes && (
         <section className="card stack" style={{ '--gap': '10px' } as React.CSSProperties}>
+          <span className="eyebrow">Weeks {notes.from}–{notes.to}</span>
           <div className="row between wrap-row"><h3>{notes.title}</h3>{PREGNANCY_WEEKS_REVIEW.status === 'reviewed'
             ? <span className="badge developing">Reviewed by {PREGNANCY_WEEKS_REVIEW.reviewer}, {PREGNANCY_WEEKS_REVIEW.credentials}</span>
             : <span className="badge limited">Clinical review in progress</span>}</div>
@@ -220,7 +226,7 @@ export function PregnancyView() {
         {[...data.appointments].sort((a, b) => (a.date < b.date ? -1 : 1)).map((a) => (
           <div key={a.id} className="list-btn" style={{ cursor: 'default' }}>
             <span><strong>{a.title}</strong><span className="small muted"> · {formatLong(a.date)}</span></span>
-            <button className="btn ghost" aria-label={`Remove ${a.title}`} onClick={() => update((d) => ({ ...d, appointments: d.appointments.filter((x) => x.id !== a.id) }))}><Icon name="trash" size={18} /></button>
+            <button className="btn ghost" style={{ minWidth: 44 }} aria-label={`Remove ${a.title}`} onClick={() => update((d) => ({ ...d, appointments: d.appointments.filter((x) => x.id !== a.id) }))}><Icon name="trash" size={18} /></button>
           </div>
         ))}
         <div className="row wrap-row">
@@ -230,18 +236,42 @@ export function PregnancyView() {
         </div>
       </section>
 
-      <section className="card stack" style={{ '--gap': '10px' } as React.CSSProperties}>
-        <h3>Symptom journal</h3>
-        <p className="small muted">Log symptoms, mood, sleep and notes any day. They stay private on this device.</p>
-        <Link to="/app/log" className="btn secondary">Open today’s journal</Link>
-      </section>
+      {journal ?? (
+        <section className="card stack" style={{ '--gap': '10px' } as React.CSSProperties}>
+          <h3>Symptom journal</h3>
+          <p className="small muted">Log symptoms, mood, sleep and notes any day. They stay private on this device.</p>
+          <Link to="/app/log" className="btn secondary">Open today’s journal</Link>
+        </section>
+      )}
 
       <div className="row wrap-row">
         <Link to="/app/library/due-date-explained" className="btn secondary">How due dates work</Link>
-        <button className="btn ghost" onClick={endPregnancy}>End pregnancy mode</button>
+        {!ending && <button className="btn ghost" onClick={() => setEnding(true)}>End pregnancy mode</button>}
       </div>
+      {ending && <EndPregnancySheet onConfirm={endPregnancy} onCancel={() => setEnding(false)} />}
       <MedicalNote>Ondessa is not a medical device and does not replace prenatal care.</MedicalNote>
     </div>
+  );
+}
+
+/**
+ * Ending pregnancy mode, for any reason. Neutral wording, no outcome asked, nothing deleted.
+ * An in-app panel rather than a system dialog so it can say this with care.
+ */
+export function EndPregnancySheet({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <section className="card stack" role="alertdialog" aria-labelledby="end-preg-title" aria-describedby="end-preg-body" style={{ '--gap': '12px' } as React.CSSProperties}>
+      <h3 id="end-preg-title">End pregnancy mode?</h3>
+      <div id="end-preg-body" className="stack small muted" style={{ '--gap': '8px' } as React.CSSProperties}>
+        <p>Whatever the reason, your pregnancy details stay in your history on this device. Nothing is deleted.</p>
+        <p>Cycle tracking starts again. Predictions pick up once you log your next period, and they may be less certain for a while.</p>
+        <p>If this follows a loss, please be gentle with yourself. Your midwife or doctor can support you, including with your physical recovery.</p>
+      </div>
+      <div className="row wrap-row">
+        <button className="btn" onClick={onConfirm}>Yes, end pregnancy mode</button>
+        <button className="btn secondary" autoFocus onClick={onCancel}>Keep pregnancy mode</button>
+      </div>
+    </section>
   );
 }
 
@@ -265,7 +295,7 @@ export function Insights() {
 
   return (
     <div className="stack" style={{ '--gap': '18px' } as React.CSSProperties}>
-      <PageTitle eyebrow="My Cycle, My Patterns" title={usableCount < 3 ? `Your first patterns arrive in ${3 - usableCount} cycle${3 - usableCount === 1 ? '' : 's'}` : 'What your logs show'}>Every observation below comes only from what you logged, says what it’s based on, and never claims a cause.</PageTitle>
+      <PageTitle eyebrow="Insights" title={usableCount < 3 ? `Your first patterns arrive in ${3 - usableCount} cycle${3 - usableCount === 1 ? '' : 's'}` : 'What your logs show'}>Every observation below comes only from what you logged, says what it’s based on, and never claims a cause.</PageTitle>
 
       {usedLens.length >= 1 && (
         <div className="stat-grid" role="group" aria-label="Your numbers">
@@ -298,7 +328,7 @@ export function Insights() {
       {usableCount < 3 && (
         <section className="card tint-phase phase-luteal stack" style={{ '--gap': '12px' } as React.CSSProperties}>
           <span className="eyebrow">Patterns unlock after 3 complete cycles</span>
-          <div className="row" style={{ '--gap': '6px' } as React.CSSProperties} aria-label={`${usableCount} of 3 cycles complete`}>
+          <div className="row" role="img" style={{ '--gap': '6px' } as React.CSSProperties} aria-label={`${usableCount} of 3 cycles complete`}>
             {[0, 1, 2].map((i) => <span key={i} style={{ flex: 1, height: 8, borderRadius: 8, background: i < usableCount ? 'var(--phase)' : 'var(--paper)' }} />)}
           </div>
           <p className="small"><strong>{usableCount} of 3 cycles</strong> · {loggedDays} day{loggedDays === 1 ? '' : 's'} logged so far.</p>
@@ -334,10 +364,11 @@ export function Insights() {
                 <div key={c.start} className="bar">
                   <strong>{c.length}</strong>
                   <span className={`b ${c.usable ? '' : 'excluded'}`} style={{ height: `${(Math.min(c.length, maxLen) / maxLen) * 110}px` }} />
-                  <span>{formatShort(c.start).split(' ')[0]}</span>
+                  <span>{formatShort(c.start).split(' ')[0]}<br />{Number(c.start.slice(8))}</span>
                 </div>
               ))}
             </div>
+            <p className="tiny faint">Each bar is a cycle, labelled by its start date. The latest is in colour.</p>
             {all.some((c) => !c.usable) && <p className="tiny faint">Grey bars were left out of predictions (shorter than {RULES.plausibleCycle.min} or longer than {RULES.plausibleCycle.max} days).</p>}
             <div>
               {[...all].reverse().map((c) => (
@@ -359,6 +390,7 @@ export function Insights() {
 
 export function Settings() {
   const { data, update, forecast: f, today } = useStore();
+  const [pendingGoal, setPendingGoal] = useState<Goal>();
   const [notifState, setNotifState] = useState<'granted' | 'denied' | 'prompt'>();
   useEffect(() => {
     void notificationPermission().then(setNotifState);
@@ -374,6 +406,11 @@ export function Settings() {
     if (turnedOn && notifState === 'prompt') void askNotifications();
   };
   const upcoming = upcomingReminders(data, f, today, 30);
+  const applyGoal = (goal: Goal) => update((d) => ({
+    ...d,
+    ...(d.pregnancy ? { pregnancy: undefined, pastPregnancies: [...d.pastPregnancies, d.pregnancy] } : {}),
+    settings: { ...d.settings, goal, ...(goal === 'conceive' ? { showFertility: true, fertilitySigns: true } : {}) },
+  }));
 
   return (
     <div className="stack" style={{ '--gap': '18px', maxWidth: 680 } as React.CSSProperties}>
@@ -381,21 +418,18 @@ export function Settings() {
 
       <section className="card stack" style={{ '--gap': '12px' } as React.CSSProperties}>
         <h3>Life stage</h3>
-        <select className="input" value={s.goal} aria-label="Life stage" onChange={(e) => {
+        <select className="input" value={pendingGoal ?? s.goal} aria-label="Life stage" onChange={(e) => {
           const goal = e.target.value as Goal;
           if (goal === 'pregnant') return navigate('/app/pregnancy');
-          if (data.pregnancy && !window.confirm('End pregnancy mode? Your pregnancy details are kept in your history, and cycle tracking resumes.')) return;
-          update((d) => ({
-            ...d,
-            ...(d.pregnancy ? { pregnancy: undefined, pastPregnancies: [...d.pastPregnancies, d.pregnancy] } : {}),
-            settings: { ...d.settings, goal, ...(goal === 'conceive' ? { showFertility: true, fertilitySigns: true } : {}) },
-          }));
+          if (data.pregnancy) return setPendingGoal(goal);
+          applyGoal(goal);
         }}>
           <option value="understand">Understanding my cycle</option>
           <option value="conceive">Planning a pregnancy</option>
           <option value="pregnant">Pregnant</option>
           <option value="perimenopause">Changing cycles / perimenopause</option>
         </select>
+        {pendingGoal && <EndPregnancySheet onConfirm={() => { applyGoal(pendingGoal); setPendingGoal(undefined); }} onCancel={() => setPendingGoal(undefined)} />}
         <Stepper label="Usual cycle length (used until you have history)" unit="days" value={s.cycle.typicalCycleLength} min={15} max={90} onChange={(v) => set({ cycle: { ...s.cycle, typicalCycleLength: v } })} />
         <Stepper label="Usual period length" unit="days" value={s.cycle.typicalPeriodLength} min={1} max={15} onChange={(v) => set({ cycle: { ...s.cycle, typicalPeriodLength: v } })} />
       </section>
@@ -492,7 +526,7 @@ export function PrivacyCenter() {
 
       <section className="card stack" style={{ '--gap': '10px' } as React.CSSProperties}>
         <h3>What’s stored, and where</h3>
-        <p className="small muted">On this device only: {plural(counts.days, 'logged day')}, {plural(counts.notes, 'note')}, {plural(counts.appts, 'appointment')}, your settings{data.pregnancy ? ' and pregnancy details' : ''}. {locked ? 'Encrypted with your passcode.' : isNative ? 'Not encrypted. Anyone who can unlock this device and open Ondessa can view it.' : 'Not encrypted. Anyone who can open this browser can view it.'}</p>
+        {tour ? <p className="small muted">This is sample data for the tour. None of it is saved, and it disappears when you leave the tour. Once you set up Ondessa, everything you log is stored only on your device.</p> : <p className="small muted">On this device only: {plural(counts.days, 'logged day')}, {plural(counts.notes, 'note')}, {plural(counts.appts, 'appointment')}, your settings{data.pregnancy ? ' and pregnancy details' : ''}. {locked ? 'Encrypted with your passcode.' : isNative ? 'Not encrypted. Anyone who can unlock this device and open Ondessa can view it.' : 'Not encrypted. Anyone who can open this browser can view it.'}</p>}
         <p className="small muted">Sent to us or anyone else: nothing about your health. No analytics, ads or AI services run in Ondessa.</p>
         <Link to="/privacy" className="btn ghost" >Full privacy summary <Icon name="chevron" size={16} /></Link>
       </section>
@@ -532,7 +566,7 @@ export function PrivacyCenter() {
         <h3>Delete everything</h3>
         <p className="small muted">Permanently removes all Ondessa data and your membership key from this device, then checks that nothing remains. This cannot be undone. It does not cancel a subscription; manage that from Membership.</p>
         <input className="input" placeholder='Type DELETE to confirm' aria-label="Type DELETE to confirm" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} />
-        <button className="btn danger" disabled={confirmText !== 'DELETE' || tour} onClick={async () => navigate((await eraseAll()) ? '/deleted' : '/deleted-unverified', true)}><Icon name="trash" size={18} /> Permanently delete</button>
+        <button className="btn danger" disabled={confirmText.trim().toUpperCase() !== 'DELETE' || tour} onClick={async () => navigate((await eraseAll()) ? '/deleted' : '/deleted-unverified', true)}><Icon name="trash" size={18} /> Permanently delete</button>
       </section>
       <Toast msg={toast} />
     </div>
@@ -542,8 +576,16 @@ export function PrivacyCenter() {
 /* ------------------------------------------------------------------ Membership (in-app) */
 
 export function Membership() {
-  const { entitlement, refreshEntitlement } = useStore();
+  const { entitlement, refreshEntitlement, tour } = useStore();
   const [msg, setMsg] = useState<string>();
+  if (tour) {
+    return (
+      <div className="stack" style={{ '--gap': '14px', maxWidth: 640 } as React.CSSProperties}>
+        <PageTitle eyebrow="Membership" title="You’re on the tour">No membership is needed to look around. When you set up Ondessa with your own data, you’ll see your plan, renewal date and how to manage it here.</PageTitle>
+        <Link to="/plans" className="btn secondary">See plans</Link>
+      </div>
+    );
+  }
   const active = entitlement.status === 'active';
   const planName = !active ? 'None' : entitlement.plan === 'preview' ? 'Preview pass' : entitlement.plan === 'annual' ? 'Yearly' : 'Monthly';
   const renewal = !active ? '—'

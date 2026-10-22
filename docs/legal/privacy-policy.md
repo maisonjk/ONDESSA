@@ -2,7 +2,7 @@
 
 > **DRAFT FOR COUNSEL.** Written to match the app's actual architecture as of October 2026. Not legal advice. A qualified lawyer must review it against applicable law (including the FTC Health Breach Notification Rule, Washington My Health My Data Act, California CCPA/CPRA and CMIA, Connecticut and Nevada consumer health data laws, and GDPR/UK GDPR if offered in Europe) before publication. Replace bracketed items.
 
-**Effective date:** [date] · **Publisher:** [legal entity name], [address] · **Contact:** [support email]
+**Effective date:** [date] · **Publisher:** [legal entity name], [address] · **Contact:** innerlink24@gmail.com
 
 ## The short version
 
@@ -28,7 +28,7 @@ We cannot access this information. We have no copy of it and cannot recover it f
 | What | Who receives it | Why |
 |---|---|---|
 | Purchase and subscription status | Apple (App Store) or Google (Google Play) | To process your subscription. They act under their own privacy policies. We receive subscription status and transaction records that do not include your health information. [If a receipt-validation server is used: describe it, what it stores (transaction ID, product, expiry), and retention.] |
-| Support emails you send | [support provider] | To answer you. Please don't include health information. |
+| Support emails you send | Gmail (Google), at innerlink24@gmail.com | To answer you. Please don't include health information. |
 | Web visits to our website | [hosting provider] | Standard server logs (IP address, browser type, page requested) kept for [N] days for security. App screens are not in these logs. |
 
 We do not collect your name, email, phone number, date of birth or location in the app.
@@ -46,7 +46,7 @@ We do not collect your name, email, phone number, date of birth or location in t
 - **Export:** Privacy center → Backup & export.
 - **Notifications:** turn reminders on or off in Settings, or in your device's notification settings.
 - **Subscriptions:** manage or cancel in your App Store or Google Play account.
-- **Your rights:** [state-law and GDPR rights wording from counsel]. Because we don't hold your health data, most requests are fulfilled by the in-app delete and export tools. Contact [support email] for anything else.
+- **Your rights:** [state-law and GDPR rights wording from counsel]. Because we don't hold your health data, most requests are fulfilled by the in-app delete and export tools. Contact innerlink24@gmail.com for anything else.
 
 ## 5. Children
 
@@ -62,4 +62,4 @@ We will post changes here and update the effective date. Material changes will b
 
 ## 8. Contact
 
-[legal entity], [address], [support email].
+[legal entity], [address], innerlink24@gmail.com.

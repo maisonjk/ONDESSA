@@ -21,6 +21,8 @@ export interface StoreProduct {
   plan: StorePlan;
   /** Localised price string from the store, e.g. "$59.99". */
   price: string;
+  /** Store price in millionths of the local currency, for comparing plans. */
+  priceMicros?: number;
   /** Introductory free trial configured in App Store Connect / Play Console, if offered. */
   trial?: { days: number; label: string };
 }
@@ -32,7 +34,7 @@ interface CdvPhase { paymentMode?: string; billingPeriod?: string }
 interface CdvOffer { id: string; pricingPhases?: CdvPhase[] }
 interface CdvProduct {
   id: string;
-  pricing?: { price: string };
+  pricing?: { price: string; priceMicros?: number };
   offers?: CdvOffer[];
   getOffer(id?: string): CdvOffer | undefined;
 }
@@ -100,7 +102,7 @@ export async function loadProducts(): Promise<StoreProduct[]> {
     if (!p?.pricing) return [];
     const phase = p.offers?.flatMap((o) => o.pricingPhases ?? []).find((ph) => ph.paymentMode === 'FreeTrial');
     const trial = phase?.billingPeriod ? parseTrial(phase.billingPeriod) : undefined;
-    return [{ plan, price: p.pricing.price, ...(trial ? { trial } : {}) }];
+    return [{ plan, price: p.pricing.price, ...(p.pricing.priceMicros ? { priceMicros: p.pricing.priceMicros } : {}), ...(trial ? { trial } : {}) }];
   });
 }
 

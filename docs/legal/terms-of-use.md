@@ -47,4 +47,4 @@ Educational content is general information reviewed by qualified clinicians, not
 
 ## 8. Contact
 
-[legal entity], [support email].
+[legal entity], innerlink24@gmail.com.

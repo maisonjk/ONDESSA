@@ -8,7 +8,7 @@ import { activateToken, previewPassAvailable } from '../data/entitlement';
 import { isNative, openExternal, platform } from '../platform';
 import { loadProducts, purchase, restorePurchases, type StorePlan } from '../platform/purchases';
 import { scheduleTrialReminder } from '../platform/notifications';
-import { diffDays, forecast, formatLong, formatShort, localToday, phaseOn, PHASE_COPY } from '../engine';
+import { diffDays, forecast, formatLong, formatShort, localToday, phaseOn, pregnancyStatus, PHASE_COPY } from '../engine';
 import { tourData } from '../app/tour';
 import { ConfidenceBadge, DotRing, Icon, Mark, MedicalNote, PhasePill } from '../ui/components';
 
@@ -17,15 +17,26 @@ export const PRICES = {
   annual: { amount: 59.99, label: '$59.99', per: 'per year' },
 } as const;
 
-/** What a member gets, framed as outcomes. Shown before any price on the plans screen. */
+/** What a member gets, framed as outcomes, ordered by what the person said they came for. */
 const BENEFITS: [string, string][] = [
   ['Know what’s coming', 'Period and fertile-window predictions that show how sure they are, and get sharper every cycle.'],
-  ['Understand your body', 'My Cycle, My Patterns links your symptoms, mood and energy to your own cycle. Never generic averages.'],
+  ['Understand your body', 'Insights link your symptoms, mood and energy to your own cycle. Never generic averages.'],
   ['Trying to conceive', 'Best days with the honest range, plus optional LH, temperature and mucus tracking.'],
   ['Pregnancy, week by week', 'A calm calendar, appointment reminders and space to note how you feel.'],
   ['Irregular or changing cycles', 'Perimenopause and irregular-cycle support that stays honest when patterns shift.'],
   ['Private, for real', 'No account, no ads, no data sold. Passcode encryption, encrypted backups, delete anytime.'],
 ];
+
+const BENEFIT_ORDER: Record<Goal, number[]> = {
+  understand: [0, 1, 5, 4, 2, 3],
+  conceive: [2, 0, 1, 5, 3, 4],
+  pregnant: [3, 5, 1, 0, 2, 4],
+  perimenopause: [4, 1, 0, 5, 2, 3],
+};
+
+function benefitsFor(goal: Goal): [string, string][] {
+  return BENEFIT_ORDER[goal].map((i) => BENEFITS[i]!);
+}
 
 export function PublicShell({ children }: { children: React.ReactNode }) {
   const { data, entitlement, tour } = useStore();
@@ -37,7 +48,9 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
         <div className="wrap">
           {isNative ? (
             <>
-              <button className="btn ghost" onClick={() => window.history.back()}><Icon name="back" size={18} /> Back</button>
+              {inApp ? <Link to="/app" className="btn ghost"><Icon name="back" size={18} /> Back</Link>
+                : setUp ? <Link to="/app/privacy" className="btn ghost">Your data</Link>
+                  : <button className="btn ghost" onClick={() => window.history.back()}><Icon name="back" size={18} /> Back</button>}
               <span className="wordmark"><Mark /> Ondessa</span>
             </>
           ) : (
@@ -103,7 +116,7 @@ export function Landing() {
             <h2 style={{ maxWidth: '18ch' }}>Not another period calendar.</h2>
             <div className="pillars">
               {[
-                { icon: 'spark', t: 'My Cycle, My Patterns', d: 'Observations drawn only from your logs, with the evidence and limits written next to every one.' },
+                { icon: 'spark', t: 'Insights from your own logs', d: 'Observations drawn only from your logs, with the evidence and limits written next to every one.' },
                 { icon: 'info', t: 'Predictions that show their work', d: 'Three honest confidence levels. Wider windows when your cycles vary. Never a fact when it is an estimate.' },
                 { icon: 'shield', t: 'Private by architecture', d: 'Your data lives on your device. Optional passcode encryption. Export or permanently delete in one tap.' },
               ].map((p) => (
@@ -154,23 +167,31 @@ export function Landing() {
 export function Plans() {
   const { data, entitlement, refreshEntitlement, usePreviewPass, forecast: f, tour, startTour } = useStore();
   const pregnant = !!(data && !tour && data.pregnancy);
+  const preg = pregnant ? pregnancyStatus(data!.pregnancy!, localToday(), data!.settings.cycle.typicalCycleLength) : undefined;
+  const goal: Goal = data && !tour ? data.settings.goal : 'understand';
   const mine = data && !tour && !pregnant ? f : undefined;
   const hasPrediction = !!mine?.nextPeriod;
   const [plan, setPlan] = useState<'annual' | 'monthly'>('annual');
   const [key, setKey] = useState('');
   const [keyMsg, setKeyMsg] = useState<string>();
   const active = entitlement.status === 'active';
-  const saving = Math.round((1 - PRICES.annual.amount / (PRICES.monthly.amount * 12)) * 100);
   const [storePrices, setStorePrices] = useState<Partial<Record<StorePlan, string>>>({});
+  const [storeMicros, setStoreMicros] = useState<Partial<Record<StorePlan, number>>>({});
   const [trials, setTrials] = useState<Partial<Record<StorePlan, { days: number; label: string }>>>({});
   useEffect(() => {
     if (!isNative) return;
     void loadProducts().then((ps) => {
       setStorePrices(Object.fromEntries(ps.map((p) => [p.plan, p.price])));
+      setStoreMicros(Object.fromEntries(ps.flatMap((p) => (p.priceMicros ? [[p.plan, p.priceMicros]] : []))));
       setTrials(Object.fromEntries(ps.flatMap((p) => (p.trial ? [[p.plan, p.trial]] : []))));
     });
   }, []);
   const trial = trials[plan];
+  // The saving must come from the prices actually shown: store prices on native (local currency),
+  // the list prices on the web. Hidden if store prices are shown without numeric amounts.
+  const saving = storeMicros.annual && storeMicros.monthly
+    ? Math.round((1 - storeMicros.annual / (storeMicros.monthly * 12)) * 100)
+    : storePrices.annual ? undefined : Math.round((1 - PRICES.annual.amount / (PRICES.monthly.amount * 12)) * 100);
   const priceOf = (p: StorePlan) => storePrices[p] ?? PRICES[p].label;
 
   const restore = async () => {
@@ -206,21 +227,23 @@ export function Plans() {
           </section>
         )}
 
-        <section className="benefits" aria-label="What membership includes">
-          {BENEFITS.map(([t, d]) => (
-            <div key={t} className="benefit">
-              <strong>{t}</strong>
-              <span className="small muted">{d}</span>
+        {pregnant && preg && (
+          <section className="prediction-card phase-follicular" aria-label="Your pregnancy">
+            <div className="stack" style={{ '--gap': '10px' } as React.CSSProperties}>
+              <span className="eyebrow">Pregnancy · trimester {preg.trimester}</span>
+              <span className="kicker-num" style={{ fontSize: '2.8rem' }}>Week {preg.week}{preg.day ? ` + ${preg.day}` : ''}</span>
+              <span className="small muted">Estimated due date {formatShort(preg.dueDate)}{preg.source === 'clinician' ? ', from your clinician' : ', from your last period'}. Week-by-week notes, appointments and a symptom journal are ready.</span>
             </div>
-          ))}
-        </section>
+          </section>
+        )}
+
 
         <div className="stack" style={{ '--gap': '10px' } as React.CSSProperties}>
           <span className="eyebrow center">Choose how you’d like to pay</span>
           <div className="price-grid">
             {(['annual', 'monthly'] as const).map((p) => (
               <button key={p} type="button" className={`card plan stack ${plan === p ? 'selected' : ''}`} style={{ '--gap': '6px', textAlign: 'left', cursor: 'pointer' } as React.CSSProperties} onClick={() => setPlan(p)} aria-pressed={plan === p}>
-                <div className="row between"><span className="eyebrow">{p === 'annual' ? 'Yearly' : 'Monthly'}</span>{p === 'annual' && <span className="badge established">Best value · save {saving}%</span>}</div>
+                <div className="row between"><span className="eyebrow">{p === 'annual' ? 'Yearly' : 'Monthly'}</span>{p === 'annual' && (saving && saving > 0 ? <span className="badge established">Best value · save {saving}%</span> : <span className="badge established">Best value</span>)}</div>
                 <span className="price">{priceOf(p)}<small>{PRICES[p].per}</small></span>
                 <span className="small muted">{p === 'annual' ? (storePrices.annual ? 'One payment covers the whole year.' : `Works out to about $${(PRICES.annual.amount / 12).toFixed(2)} a month.`) : 'Flexible. Stop whenever you like.'}</span>
                 <span className="tiny faint">Renews automatically at {priceOf(p)} {PRICES[p].per} until you cancel.</span>
@@ -260,6 +283,22 @@ export function Plans() {
               </button>
             )}
           </div>
+        )}
+
+        <section className="stack" style={{ '--gap': '10px' } as React.CSSProperties} aria-label="What membership includes">
+          <span className="eyebrow center">Everything is included in both plans</span>
+          <ul className="benefit-list">
+            {benefitsFor(goal).map(([t, d]) => (
+              <li key={t}><span className="tick" aria-hidden="true"><Icon name="check" size={14} /></span><span><strong>{t}</strong> <span className="small muted">{d}</span></span></li>
+            ))}
+          </ul>
+        </section>
+
+        {data && !tour && !active && (
+          <Link to="/app/privacy" className="card stack" >
+            <span className="row between"><strong>Your data stays yours</strong><Icon name="chevron" size={18} /></span>
+            <span className="small muted">With or without a membership, you can back up, export or permanently delete what you’ve entered.</span>
+          </Link>
         )}
 
         {!mine && !isNative && (
@@ -471,7 +510,7 @@ export function Help() {
         {COMPANY.supportEmail && (
           <div className="card stack" style={{ '--gap': '6px' } as React.CSSProperties}>
             <h3>Contact support</h3>
-            <p className="small muted">Email us at <strong style={{ userSelect: 'all' }}>{COMPANY.supportEmail}</strong></p>
+            <p className="small muted">Email us at <a href={`mailto:${COMPANY.supportEmail}?subject=Ondessa%20support`} style={{ fontWeight: 600, userSelect: 'all' }}>{COMPANY.supportEmail}</a>.</p>
           </div>
         )}
         <div className="callout sage">Please do not include health details when you contact support. We never need them to help with your membership or the app.</div>

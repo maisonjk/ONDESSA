@@ -83,7 +83,7 @@ module.exports = [
       await page.getByRole('button', { name: /preview pass/ }).click();
       await page.waitForURL(/#\/app$/);
       assert.equal(await page.locator('main h1').first().textContent(), 'Week 20');
-      assert.ok((await page.locator('main').innerText()).includes('(from your clinician)'));
+      assert.ok((await page.locator('main').innerText()).includes('date from your clinician'));
     },
   },
   {

@@ -10,7 +10,7 @@ A private, paid cycle, fertility and pregnancy companion. Local-first: health da
 npm install
 npm run dev            # http://localhost:5173 (preview pass available in dev)
 npm test               # 85 unit tests
-npm run test:e2e       # 125 end-to-end tests: every screen, time zones, accessibility (axe), privacy
+npm run test:e2e       # 139 end-to-end tests: every screen, time zones, accessibility (axe), privacy
 npm run test:tz        # same suite in 4 time zones (DST and half-hour DST)
 npm run build          # production build with strict CSP in dist/
 npm run licenses       # OSS license inventory

@@ -15,7 +15,7 @@ Built from three independent audits on 2026-10-22: an App Store submission speci
 | Privacy manifest, Face ID text, icons, splash | ✅ |
 | Android target API 36, cloud backup off, no exact alarms | ✅ |
 | No preview pass in store builds | ✅ Enforced |
-| Data-loss and security fixes from code review | ✅ 85 unit tests + 125 end-to-end tests (all 13 QA bugs and 3 accessibility issues fixed and guarded) |
+| Data-loss and security fixes from code review | ✅ 85 unit tests + 139 end-to-end tests (all 13 QA bugs and 3 accessibility issues fixed and guarded) |
 | Clinical review of content and prediction thresholds | ❌ Blocker: needs a licensed clinician |
 | Final Privacy Policy and Terms | ❌ Blocker: drafts in `docs/legal/` need a lawyer |
 | Company details, support email, public URLs | ❌ Blocker: fill `src/content/company.ts` |

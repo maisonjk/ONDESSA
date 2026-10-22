@@ -196,11 +196,13 @@ module.exports = [
       assert.ok(!(await page.locator('main').innerText()).includes('Your period may start'), 'period reminder while pregnant');
       await L.hashGo(page, '/app/pregnancy');
       await page.getByRole('button', { name: 'End pregnancy mode' }).click();
+      assert.match(await page.getByRole('alertdialog').innerText(), /Nothing is deleted/);
+      await page.getByRole('button', { name: 'Yes, end pregnancy mode' }).click();
       await L.settle(page);
       v = (await L.readVault(page)).data;
       assert.equal(v.pregnancy, undefined);
       assert.equal(v.pastPregnancies.length, 1);
-      assert.ok(mon.dialogs.some((m) => m.startsWith('End pregnancy mode?')));
+      assert.equal(mon.dialogs.length, 0, 'no system dialog for ending pregnancy mode');
       await L.hashGo(page, '/app');
       assert.equal(await page.locator('.phase-hero').count(), 1, 'cycle tracking resumes');
     },
