@@ -47,6 +47,7 @@ The axe tests use the `axe-core` dev dependency (or `AXE_PATH`). `npm run test:e
 | 08-responsive | 320/390/768/1280 × light/dark: horizontal scroll, off-screen, tab bar overlap |
 | 09-a11y | axe WCAG 2.1 AA on every screen, contrast, touch targets, switches, keyboard-only |
 | 10-hygiene | full crawl for console errors and external requests, CSP, no dates in URLs |
+| 11-v2 | heads-up, log tiles, smart symptom order, saved bar, evidence strips, recap, past periods, partner sharing and calendar file, You tab, appearance; strict axe + 44px targets on the new screens |
 
 ## Bug history
 

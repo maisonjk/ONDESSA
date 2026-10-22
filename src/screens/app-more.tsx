@@ -10,10 +10,11 @@ import { PREGNANCY_WEEKS_REVIEW, weekNotes } from '../content/library';
 import { BackupNeedsPassword, makeBackup, readBackup } from '../data/backup';
 import { WrongPassphraseError } from '../data/crypto';
 import {
-  CONFIDENCE_COPY, RULES, addDays, localToday, upcomingFertileWindow, detectThermalShift, dueDateFromLmp, formatLong, formatRange, formatShort,
+  CONFIDENCE_COPY, RULES, addDays, lastCycleRecap, accuracyHeadline, median, localToday, upcomingFertileWindow, detectThermalShift, dueDateFromLmp, formatLong, formatRange, formatShort,
   pregnancyStatus, upcomingReminders, type AppData, type Confidence, type Goal,
 } from '../engine';
-import { ConfidenceBadge, Icon, MedicalNote, PageTitle, Segmented, Toast, ToggleRow, useToast } from '../ui/components';
+import { ConfidenceBadge, EvidenceStrip, Icon, MedicalNote, PageTitle, Segmented, Toast, ToggleRow, useToast } from '../ui/components';
+import { getTheme, setTheme, type ThemeChoice } from '../ui/theme';
 import { Stepper } from './onboarding';
 
 /* ------------------------------------------------------------------ Fertility */
@@ -247,8 +248,11 @@ export function PregnancyView() {
 /* ------------------------------------------------------------------ Insights */
 
 export function Insights() {
-  const { data, forecast: f, insights } = useStore();
+  const { data, forecast: f, insights, today } = useStore();
   if (!data || !f) return null;
+  const recap = lastCycleRecap(data, today);
+  const usedLens = f.usedCycleLengths;
+  const recentPeriods = f.cycles.filter((c) => c.usable).slice(-6).map((c) => c.periodLength);
   const all = f.cycles.slice(-12);
   const usableCount = f.usableCycleCount;
   const loggedDays = Object.keys(data.logs).length;
@@ -261,7 +265,23 @@ export function Insights() {
 
   return (
     <div className="stack" style={{ '--gap': '18px' } as React.CSSProperties}>
-      <PageTitle eyebrow="My Cycle, My Patterns" title="What your logs show">Every observation below comes only from what you logged, says what it’s based on, and never claims a cause.</PageTitle>
+      <PageTitle eyebrow="My Cycle, My Patterns" title={usableCount < 3 ? `Your first patterns arrive in ${3 - usableCount} cycle${3 - usableCount === 1 ? '' : 's'}` : 'What your logs show'}>Every observation below comes only from what you logged, says what it’s based on, and never claims a cause.</PageTitle>
+
+      {usedLens.length >= 1 && (
+        <div className="stat-grid" role="group" aria-label="Your numbers">
+          <div><div className="kicker-num">{f.predictedCycleLength}<small>d</small></div><div className="small muted">Typical cycle</div></div>
+          <div><div className="kicker-num">{recentPeriods.length ? Math.round(median(recentPeriods)) : f.predictedPeriodLength}<small>d</small></div><div className="small muted">Typical period</div></div>
+          <div><div className="kicker-num">{usedLens.length >= 2 ? Math.max(...usedLens) - Math.min(...usedLens) : '—'}{usedLens.length >= 2 && <small>d</small>}</div><div className="small muted">{usedLens.length < 2 ? 'Spread' : Math.min(...usedLens) === Math.max(...usedLens) ? 'Spread, all equal' : `Spread, ${Math.min(...usedLens)}–${Math.max(...usedLens)} days`}</div></div>
+        </div>
+      )}
+
+      {recap && (
+        <Link to="/app/recap" className="card stack phase-menstrual" >
+          <span className="row between"><span className="eyebrow">Last cycle recap</span><Icon name="chevron" size={18} /></span>
+          <strong>{accuracyHeadline(recap)}</strong>
+          <span className="small muted">{recap.length} days · {recap.daysLogged} days logged{recap.predicted ? ` · predicted ${formatShort(recap.predicted)}, started ${formatShort(recap.nextStart)}` : ''}</span>
+        </Link>
+      )}
 
       <section className="card stack" style={{ '--gap': '12px' } as React.CSSProperties}>
         <div className="row between wrap-row"><h3>Prediction confidence</h3><ConfidenceBadge level={f.confidence} /></div>
@@ -283,15 +303,25 @@ export function Insights() {
           </div>
           <p className="small"><strong>{usableCount} of 3 cycles</strong> · {loggedDays} day{loggedDays === 1 ? '' : 's'} logged so far.</p>
           {topThisCycle && <p className="small muted">Most logged this cycle: {topThisCycle}.</p>}
+          <div className="row wrap-row" style={{ '--gap': '8px' } as React.CSSProperties}>
+            <Link to="/app/history" className="btn">Skip the wait: add past periods</Link>
+            <Link to="/app/log" className="btn secondary">Log today</Link>
+          </div>
         </section>
       )}
 
       {insights.filter((i) => i.id !== 'limited-history' || usableCount >= 3).map((i) => (
-        <section key={i.id} className={`card stack ${i.kind === 'care' || i.kind === 'range' ? 'tint-berry' : ''}`} style={{ '--gap': '8px' } as React.CSSProperties}>
-          <h3>{i.title}</h3>
+        <section key={i.id} className={`card stack ${i.kind === 'care' || i.kind === 'range' ? 'tint-berry' : ''} ${i.kind === 'symptom' ? 'phase-menstrual' : 'phase-fertile'}`} style={{ '--gap': '8px' } as React.CSSProperties}>
+          <h3 className="display" style={{ fontFamily: 'var(--display)', fontWeight: 400, fontSize: '1.5rem', lineHeight: 1.1 }}>{i.title}</h3>
+          {i.evidence && <EvidenceStrip hits={i.evidence.hits} total={i.evidence.total} label={i.evidence.label} />}
           <p>{i.body}</p>
-          <p className="small muted"><strong>Based on:</strong> {i.basis}</p>
-          <p className="small muted"><strong>Keep in mind:</strong> {i.limitation}</p>
+          <details className="small">
+            <summary style={{ cursor: 'pointer', fontWeight: 560, minHeight: 44, display: 'flex', alignItems: 'center' }}>Based on, and what to keep in mind</summary>
+            <div className="stack" style={{ '--gap': '6px', marginTop: 4 } as React.CSSProperties}>
+              <p className="muted"><strong>Based on:</strong> {i.basis}</p>
+              <p className="muted"><strong>Keep in mind:</strong> {i.limitation}</p>
+            </div>
+          </details>
         </section>
       ))}
 
@@ -325,32 +355,7 @@ export function Insights() {
   );
 }
 
-/* ------------------------------------------------------------------ More / Settings */
-
-export function More() {
-  const items = [
-    { to: '/app/pregnancy', icon: 'heart', t: 'Pregnancy', d: 'Pregnancy mode and calendar' },
-    { to: '/app/fertility', icon: 'leaf', t: 'Fertility & ovulation', d: 'Estimated window and signs' },
-    { to: '/app/library', icon: 'book', t: 'Library', d: 'Guides on cycles, fertility and pregnancy, with sources' },
-    { to: '/app/settings', icon: 'bell', t: 'Reminders & settings', d: 'Cycle, reminders, life stage' },
-    { to: '/app/privacy', icon: 'shield', t: 'Privacy center', d: 'Passcode, backup, export, delete' },
-    { to: '/app/membership', icon: 'spark', t: 'Membership', d: 'Plan, renewal, membership key' },
-    { to: '/help', icon: 'info', t: 'Help & legal', d: 'FAQ, terms, disclaimers' },
-  ];
-  return (
-    <div className="stack" style={{ maxWidth: 640 } as React.CSSProperties}>
-      <PageTitle title="More" />
-      <div className="card" style={{ paddingTop: 4, paddingBottom: 4 }}>
-        {items.map((i) => (
-          <Link key={i.to} to={i.to} className="list-btn">
-            <span className="row"><span style={{ color: 'var(--berry)' }}><Icon name={i.icon} /></span><span><span style={{ fontWeight: 600, display: 'block' }}>{i.t}</span><span className="small muted">{i.d}</span></span></span>
-            <Icon name="chevron" />
-          </Link>
-        ))}
-      </div>
-    </div>
-  );
-}
+/* ------------------------------------------------------------------ Settings */
 
 export function Settings() {
   const { data, update, forecast: f, today } = useStore();
@@ -408,6 +413,7 @@ export function Settings() {
           }));
         }} />
         <div className="toggle-row"><span style={{ fontWeight: 600 }}>Temperature unit</span><Segmented label="Temperature unit" value={s.temperatureUnit} onChange={(v) => set({ temperatureUnit: v })} options={[{ value: 'C', label: '°C' }, { value: 'F', label: '°F' }]} /></div>
+        <div className="toggle-row" style={{ flexWrap: 'wrap', rowGap: 10 }}><span style={{ fontWeight: 600 }}>Appearance</span><AppearancePicker /></div>
         <div className="toggle-row"><span style={{ fontWeight: 600 }}>Week starts on</span><Segmented label="Week starts on" value={String(s.weekStartsOn) as '0' | '1'} onChange={(v) => set({ weekStartsOn: v === '0' ? 0 : 1 })} options={[{ value: '1', label: 'Mon' }, { value: '0', label: 'Sun' }]} /></div>
       </section>
 
@@ -609,6 +615,11 @@ function QuickUnlock({ notify }: { notify: (m: string) => void }) {
       )}
     </div>
   );
+}
+
+function AppearancePicker() {
+  const [theme, set] = useState<ThemeChoice>(getTheme);
+  return <Segmented full label="Appearance" value={theme} onChange={(v) => { setTheme(v); set(v); }} options={[{ value: 'system', label: 'Auto' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} />;
 }
 
 function plural(n: number, word: string): string {

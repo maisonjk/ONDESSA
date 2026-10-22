@@ -7,6 +7,7 @@ import { COMPANY } from '../content/company';
 import { activateToken, previewPassAvailable } from '../data/entitlement';
 import { isNative, openExternal, platform } from '../platform';
 import { loadProducts, purchase, restorePurchases, type StorePlan } from '../platform/purchases';
+import { scheduleTrialReminder } from '../platform/notifications';
 import { diffDays, forecast, formatLong, formatShort, localToday, phaseOn, PHASE_COPY } from '../engine';
 import { tourData } from '../app/tour';
 import { ConfidenceBadge, DotRing, Icon, Mark, MedicalNote, PhasePill } from '../ui/components';
@@ -161,10 +162,15 @@ export function Plans() {
   const active = entitlement.status === 'active';
   const saving = Math.round((1 - PRICES.annual.amount / (PRICES.monthly.amount * 12)) * 100);
   const [storePrices, setStorePrices] = useState<Partial<Record<StorePlan, string>>>({});
+  const [trials, setTrials] = useState<Partial<Record<StorePlan, { days: number; label: string }>>>({});
   useEffect(() => {
     if (!isNative) return;
-    void loadProducts().then((ps) => setStorePrices(Object.fromEntries(ps.map((p) => [p.plan, p.price]))));
+    void loadProducts().then((ps) => {
+      setStorePrices(Object.fromEntries(ps.map((p) => [p.plan, p.price])));
+      setTrials(Object.fromEntries(ps.flatMap((p) => (p.trial ? [[p.plan, p.trial]] : []))));
+    });
   }, []);
+  const trial = trials[plan];
   const priceOf = (p: StorePlan) => storePrices[p] ?? PRICES[p].label;
 
   const restore = async () => {
@@ -223,13 +229,24 @@ export function Plans() {
           </div>
         </div>
 
+        {trial && !active && (
+          <section className="card stack" style={{ '--gap': '0px' } as React.CSSProperties} aria-label="How the free trial works">
+            <span className="eyebrow" style={{ marginBottom: 12 }}>Free for {trial.label}, then {priceOf(plan)} {PRICES[plan].per}</span>
+            <ol className="trial-steps">
+              <li><strong>Today</strong><span className="small muted">Full access: predictions, insights, fertility and pregnancy mode.</span></li>
+              {trial.days >= 3 && <li><strong>Day {trial.days - 2}</strong><span className="small muted">Ondessa reminds you on this device that the trial ends in 2 days.</span></li>}
+              <li><strong>Day {trial.days}</strong><span className="small muted">Your membership starts. Cancel before then and you won’t be charged.</span></li>
+            </ol>
+          </section>
+        )}
+
         {active ? (
           <div className="card tint-sage stack" style={{ '--gap': '10px' } as React.CSSProperties}>
             <strong>Your membership is active.</strong>
             <button className="btn" onClick={() => navigate(data ? '/app' : '/start')}>{data ? 'Open Ondessa' : 'Set up Ondessa'}</button>
           </div>
         ) : isNative ? (
-          <NativeCheckout plan={plan} price={priceOf(plan)} onDone={() => navigate(data ? '/app' : '/start')} />
+          <NativeCheckout plan={plan} price={priceOf(plan)} trial={trial} onDone={() => navigate(data ? '/app' : '/start')} />
         ) : (
           <div className="stack" style={{ '--gap': '12px' } as React.CSSProperties}>
             <button className="btn block" disabled title="Web checkout is not connected yet">
@@ -280,7 +297,7 @@ export function Plans() {
 }
 
 /** App Store / Google Play checkout with restore. Prices come from the store, localised. */
-function NativeCheckout({ plan, price, onDone }: { plan: StorePlan; price: string; onDone: () => void }) {
+function NativeCheckout({ plan, price, trial, onDone }: { plan: StorePlan; price: string; trial?: { days: number; label: string }; onDone: () => void }) {
   const { refreshEntitlement } = useStore();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string>();
@@ -290,7 +307,10 @@ function NativeCheckout({ plan, price, onDone }: { plan: StorePlan; price: strin
     const r = await purchase(plan);
     await refreshEntitlement();
     setBusy(false);
-    if (r === 'purchased') onDone();
+    if (r === 'purchased') {
+      if (trial) void scheduleTrialReminder(trial.days).catch(() => {});
+      onDone();
+    }
     else if (r === 'unavailable') setMsg('Purchases aren’t available right now. Check your connection and try again.');
     else if (r === 'error') setMsg('The purchase didn’t go through. You have not been charged.');
   };
@@ -305,7 +325,7 @@ function NativeCheckout({ plan, price, onDone }: { plan: StorePlan; price: strin
   return (
     <div className="stack" style={{ '--gap': '12px' } as React.CSSProperties}>
       <button className="btn block" disabled={busy} onClick={buy}>
-        {busy ? 'One moment…' : `Subscribe ${plan === 'annual' ? 'yearly' : 'monthly'} · ${price}`}
+        {busy ? 'One moment…' : trial ? `Start ${trial.label} free trial` : `Subscribe ${plan === 'annual' ? 'yearly' : 'monthly'} · ${price}`}
       </button>
       <button className="btn secondary block" disabled={busy} onClick={restore}>Restore purchases</button>
       {msg && <p className="small center" role="status">{msg}</p>}
@@ -430,7 +450,7 @@ const FAQ: [string, string][] = [
   ['What if I forget my passcode?', 'Encrypted data cannot be unlocked without it. You can erase the app and restore from a backup.'],
   ['Why does my prediction say “limited data”?', 'Predictions become more personal after 3 complete cycles and reach “established” after 6 consistent cycles. Until then, Ondessa leans on the cycle length you entered.'],
   ['Can I use Ondessa as birth control?', 'No. Ondessa is not a contraceptive and its fertile-window estimates must not be used to avoid pregnancy.'],
-  ['How do I cancel?', 'More → Membership → Manage subscription. Cancelling keeps access until the end of the paid period and does not delete your data.'],
+  ['How do I cancel?', 'You → Membership → Manage subscription. Cancelling keeps access until the end of the paid period and does not delete your data.'],
   ['How do I delete everything?', 'Privacy center → Delete everything. It removes all Ondessa data from this device and verifies the deletion.'],
 ];
 
@@ -470,6 +490,7 @@ export function PrivacyPolicy() {
         <p>Everything you log: periods, symptoms, moods, temperatures, tests, notes, pregnancy details and appointments, along with every prediction and insight. Calculations run on your device.</p>
         <h2>What leaves your device</h2>
         <p>In this version, nothing about your health. Loading the app downloads its files from our static host, which, like any web server, sees your IP address and browser type. When subscriptions go live, the payment provider processes your purchase, and the app may check your membership key. That key contains a random ID, your plan and an expiry date.</p>
+        <p>If you choose to share an update, a cycle recap or a calendar file, Ondessa hands it to the app you pick (Messages, email, your calendar) and you send it. We never receive it, and it contains only what you switched on.</p>
         <h2>What we never do</h2>
         <ul>
           <li>Sell or share reproductive health data.</li>

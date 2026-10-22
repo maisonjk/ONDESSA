@@ -9,8 +9,8 @@ A private, paid cycle, fertility and pregnancy companion. Local-first: health da
 ```bash
 npm install
 npm run dev            # http://localhost:5173 (preview pass available in dev)
-npm test               # 70 unit tests
-npm run test:e2e       # 111 end-to-end tests: every screen, time zones, accessibility (axe), privacy
+npm test               # 85 unit tests
+npm run test:e2e       # 125 end-to-end tests: every screen, time zones, accessibility (axe), privacy
 npm run test:tz        # same suite in 4 time zones (DST and half-hour DST)
 npm run build          # production build with strict CSP in dist/
 npm run licenses       # OSS license inventory
@@ -27,7 +27,7 @@ src/engine/    Pure TypeScript prediction engine and rules (no I/O)
 src/data/      IndexedDB vault, AES-GCM crypto, backups, entitlement keys
 src/content/   Static, versioned education content with sources
 src/app/       Store, router, tour data
-src/screens/   All 13 screens plus lock and recovery states
+src/screens/   All screens (incl. You, sharing, recap, past periods) plus lock and recovery states
 src/ui/        Components and the cycle ring
 docs/          Spec, ADRs, threat model, screen map, storage, engine, checklist
 public/        PWA manifest, icon, service worker, security headers

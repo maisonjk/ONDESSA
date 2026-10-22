@@ -22,7 +22,29 @@ const PATHS: Record<string, string> = {
   trash: 'M5 7h14M10 7V5h4v2m-7 0 1 13h8l1-13',
   info: 'M12 8h.01M11 12h1v5h1M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z',
   check: 'm5 12 5 5 9-10',
+  user: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-8 9c1.5-4 4.5-6 8-6s6.5 2 8 6',
+  share: 'M12 15V3m0 0L8 7m4-4 4 4M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1',
+  pulse: 'M3 12h4l2-5 4 10 2-5h6',
+  face: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm-3.5-6.5c1 1.2 2.1 1.8 3.5 1.8s2.5-.6 3.5-1.8M9 9.5h.01M15 9.5h.01',
+  people: 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm7 0a3 3 0 1 0 0-6M3 20c.8-3 3.2-4.5 6-4.5s5.2 1.5 6 4.5m1-4.4c2.4.2 4.3 1.6 5 4.4',
+  chart: 'M4 20V10m6 10V4m6 16v-7M2 20h20',
+  history: 'M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5m4-1v5l3 2',
 };
+
+/**
+ * Evidence strip: one segment per cycle looked at, filled for each cycle that showed the
+ * pattern. The text label carries the same information for screen readers.
+ */
+export function EvidenceStrip({ hits, total, label }: { hits: number; total: number; label: string }) {
+  return (
+    <div className="evidence">
+      <span className="segs" aria-hidden="true">
+        {Array.from({ length: total }, (_, i) => <i key={i} className={i < hits ? 'on' : ''} />)}
+      </span>
+      <span className="small muted">{label}</span>
+    </div>
+  );
+}
 
 export function Icon({ name, size = 22, label }: { name: keyof typeof PATHS | string; size?: number; label?: string }) {
   return (
@@ -67,9 +89,9 @@ export function ToggleRow(props: { title: string; detail?: string; checked: bool
   );
 }
 
-export function Segmented<T extends string>(props: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void; label: string }) {
+export function Segmented<T extends string>(props: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void; label: string; full?: boolean }) {
   return (
-    <div className="segmented" role="group" aria-label={props.label}>
+    <div className={`segmented${props.full ? ' full' : ''}`} role="group" aria-label={props.label}>
       {props.options.map((o) => (
         <button key={o.value} type="button" aria-pressed={props.value === o.value} onClick={() => props.onChange(o.value)}>
           {o.label}

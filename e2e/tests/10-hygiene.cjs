@@ -20,7 +20,7 @@ module.exports = [
         const d = L.emptyData(T, { logs: L.cycleHistory(L.addDays(T, -12), [28, 30, 27, 29]), settings: { goal: 'conceive', fertilitySigns: true } });
         d.appointments = [{ id: 'a1', date: L.addDays(T, 3), title: 'Scan' }];
         await L.seed(page, d);
-        for (const r of ['/app', '/app/calendar', '/app/log', '/app/fertility', '/app/pregnancy', '/app/insights', '/app/more', '/app/settings', '/app/privacy', '/app/membership', '/app/library', '/app/library/ovulation-basics']) {
+        for (const r of ['/app', '/app/calendar', '/app/log', '/app/fertility', '/app/pregnancy', '/app/insights', '/app/more', '/app/you', '/app/share', '/app/recap', '/app/history', '/app/settings', '/app/privacy', '/app/membership', '/app/library', '/app/library/ovulation-basics']) {
           await L.hashGo(page, r);
           await page.waitForTimeout(80);
         }
@@ -48,7 +48,7 @@ module.exports = [
       await L.seed(page, L.emptyData(T, { logs: L.addPeriod({}, L.addDays(T, -3)) }));
       const seen = new Set();
       page.on('framenavigated', (f) => seen.add(f.url()));
-      for (const n of ['Calendar', 'Log', 'Patterns', 'More']) await page.getByRole('link', { name: n, exact: true }).click();
+      for (const n of ['Calendar', 'Log', 'Insights', 'You']) await page.getByRole('link', { name: n, exact: true }).click();
       await page.getByRole('link', { name: 'Calendar', exact: true }).click();
       await page.locator('.cal .day').nth(10).click();
       seen.add(page.url());

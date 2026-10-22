@@ -1,23 +1,33 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, navigate } from '../app/router';
 import { useStore } from '../app/store';
 import { ARTICLES } from '../content/library';
 import {
-  addDays, classifyDay, diffDays, phaseOn, upcomingFertileWindow, weekday, PHASE_COPY, formatLong, formatRange, formatShort, monthGrid, monthName, pregnancyStatus,
+  addDays, classifyDay, commonAroundNow, diffDays, headsUp, phaseOn, upcomingFertileWindow, weekday, PHASE_COPY, formatLong, formatRange, formatShort, monthGrid, monthName, pregnancyStatus,
   upcomingReminders, MOODS, SYMPTOMS,
   type DayLog, type Flow, type ISODate, type Level, type Mucus, type Symptom,
 } from '../engine';
 import {
-  ConfidenceBadge, DotRing, Icon, Mark, MedicalNote, PageTitle, PhasePill, Toast,
+  ConfidenceBadge, DotRing, EvidenceStrip, Icon, Mark, MedicalNote, PageTitle, PhasePill, Toast,
 } from '../ui/components';
 
 const TABS = [
   { to: '/app', label: 'Today', icon: 'home' },
   { to: '/app/calendar', label: 'Calendar', icon: 'calendar' },
   { to: '/app/log', label: 'Log', icon: 'plus' },
-  { to: '/app/insights', label: 'Patterns', icon: 'spark' },
-  { to: '/app/more', label: 'More', icon: 'menu' },
+  { to: '/app/insights', label: 'Insights', icon: 'spark' },
+  { to: '/app/you', label: 'You', icon: 'user' },
 ];
+
+/** Screens reached from the You tab keep it highlighted. */
+const YOU_PATHS = ['/app/you', '/app/more', '/app/settings', '/app/privacy', '/app/membership', '/app/share', '/app/recap', '/app/history', '/app/pregnancy', '/app/fertility', '/app/library'];
+
+/** Section of the log screen to open at, set by the Today tiles. Memory only. */
+let pendingLogSection: string | undefined;
+export function openLog(section?: string) {
+  pendingLogSection = section;
+  navigate('/app/log');
+}
 
 export function AppShell({ path, children }: { path: string; children: React.ReactNode }) {
   const { tour, exitTour, today, storageError, notice, selectDate } = useStore();
@@ -46,7 +56,7 @@ export function AppShell({ path, children }: { path: string; children: React.Rea
       <div className="tabbar">
         <nav aria-label="Main">
           {TABS.map((t) => {
-            const current = t.to === '/app' ? path === '/app' : path.startsWith(t.to);
+            const current = t.to === '/app' ? path === '/app' : t.to === '/app/you' ? YOU_PATHS.some((p) => path.startsWith(p)) : path.startsWith(t.to);
             return (
               <Link key={t.to} to={t.to} className={t.icon === 'plus' ? 'log-tab' : undefined} aria-current={current ? 'page' : undefined} onClick={t.icon === 'plus' ? () => selectDate(today) : undefined}>
                 <span className={t.icon === 'plus' ? 'plus' : undefined}><Icon name={t.icon} size={t.icon === 'plus' ? 24 : 22} /></span>
@@ -63,7 +73,7 @@ export function AppShell({ path, children }: { path: string; children: React.Rea
 /* ------------------------------------------------------------------ Home */
 
 export function Home() {
-  const { data, forecast: f, insights, today, selectDate, tour } = useStore();
+  const { data, forecast: f, insights, today, tour } = useStore();
   if (!data || !f) return null;
   if (data.pregnancy) return <PregnancyHome />;
 
@@ -102,7 +112,8 @@ export function Home() {
     pill = phase ? PHASE_COPY[phase].label : 'Cycle';
   }
 
-  const topInsight = insights.find((i) => i.kind !== 'data') ?? insights[0];
+  const heads = headsUp(f, insights, today);
+  const topInsight = insights.find((i) => i.kind !== 'data' && (!heads || i.symptom !== heads.symptom)) ?? (heads ? undefined : insights[0]);
   const reminders = upcomingReminders(data, f, today, 21).filter((r) => r.id !== 'daily-log').slice(0, 3);
   const todayLog = data.logs[today];
   const fertileWin = upcomingFertileWindow(f);
@@ -144,6 +155,14 @@ export function Home() {
 
       <WeekStrip />
 
+      {heads && (
+        <Link to="/app/insights" className="card plum stack phase-menstrual heads-up" >
+          <span className="row between"><span className="eyebrow">Heads up · from your logs</span><Icon name="chevron" size={18} /></span>
+          <span className="display" style={{ fontSize: '1.6rem', lineHeight: 1.1 }}>{heads.title}</span>
+          <EvidenceStrip hits={heads.hits} total={heads.total} label={`${heads.hits} of your last ${heads.total} cycles`} />
+        </Link>
+      )}
+
       <div className="bento">
         {backupDue && (
           <section className="card tint-berry stack span-6" style={{ '--gap': '10px' } as React.CSSProperties}>
@@ -158,9 +177,9 @@ export function Home() {
             <span className="eyebrow">Today’s log</span>
             <span className="tiny faint mono">{formatShort(today).toUpperCase()}</span>
           </div>
+          <LogTiles />
           <QuickLog showFlow={showFlowFirst(f, today)} />
-          <p className="small faint">{todayLog ? summarizeLog(todayLog, data.settings.temperatureUnit) : 'Nothing logged yet. Every field is optional.'}</p>
-          <button className="btn secondary" onClick={() => { selectDate(today); navigate('/app/log'); }}>Add symptoms, mood & more</button>
+          <p className="small faint">{todayLog ? summarizeLog(todayLog, data.settings.temperatureUnit) : 'Nothing logged yet. One tap saves on this device.'}</p>
         </section>
 
         {topInsight && (
@@ -202,6 +221,30 @@ export function Home() {
       </div>
       <MedicalNote />
     </div>
+  );
+}
+
+/** Four big doors into the log screen, each showing whether that part of today is logged. */
+function LogTiles() {
+  const { data, today, selectDate } = useStore();
+  if (!data) return null;
+  const l = data.logs[today];
+  const tiles = [
+    ...(data.pregnancy ? [] : [{ id: 'log-flow', label: 'Period', icon: 'drop', phase: 'menstrual', done: !!l?.flow }]),
+    { id: 'log-symptoms', label: 'Symptoms', icon: 'pulse', phase: 'follicular', done: !!(l?.symptoms?.length || l?.pain !== undefined) },
+    { id: 'log-mood', label: 'Mood', icon: 'face', phase: 'luteal', done: !!(l?.mood || l?.energy) },
+    { id: 'log-sleep', label: 'Sleep', icon: 'moon', phase: 'fertile', done: !!l?.sleep },
+  ];
+  return (
+    <nav className="log-tiles" aria-label="Log today" style={{ gridTemplateColumns: `repeat(${tiles.length}, minmax(0, 1fr))` }}>
+      {tiles.map((t) => (
+        <a key={t.id} href="#/app/log" className={`phase-${t.phase} ${t.done ? 'done' : ''}`} aria-label={`${t.label}${t.done ? ', logged today' : ''}`}
+          onClick={(e) => { e.preventDefault(); selectDate(today); openLog(t.id); }}>
+          <span className="ico"><Icon name={t.done ? 'check' : t.icon} size={20} /></span>
+          <span aria-hidden="true">{t.label}</span>
+        </a>
+      ))}
+    </nav>
   );
 }
 
@@ -387,9 +430,24 @@ const MUCUS: { v: Mucus; label: string }[] = [
 ];
 
 export function LogDay() {
-  const { data, setLog, selectedDate, selectDate, today, notify: showToast } = useStore();
+  const { data, forecast: f, setLog, selectedDate, selectDate, today, notify: showToast } = useStore();
+  useEffect(() => {
+    const id = pendingLogSection;
+    pendingLogSection = undefined;
+    if (!id) return;
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    el.querySelector<HTMLElement>('button')?.focus({ preventScroll: true });
+  }, []);
   if (!data) return null;
   const date = selectedDate > today ? today : selectedDate;
+  const common = f ? commonAroundNow(f, data.logs, date) : [];
+  const usage = new Map<string, number>();
+  for (const l of Object.values(data.logs)) for (const x of l.symptoms ?? []) usage.set(x, (usage.get(x) ?? 0) + 1);
+  const rank = (x: string) => (common.includes(x as Symptom) ? 1000 - common.indexOf(x as Symptom) : 0) + (usage.get(x) ?? 0);
+  const orderedSymptoms = [...SYMPTOMS].sort((a, b) => rank(b) - rank(a) || SYMPTOMS.indexOf(a) - SYMPTOMS.indexOf(b));
+  const entryCount = countEntries(data.logs[date]);
   const log: DayLog = data.logs[date] ?? { date };
   const set = (patch: Partial<DayLog>) => setLog({ ...log, ...patch, date });
   const s = data.settings;
@@ -408,7 +466,7 @@ export function LogDay() {
       </div>
 
       {!data.pregnancy && (
-        <LogSection title="Bleeding">
+        <LogSection id="log-flow" title="Bleeding">
           <div className="chips">
             {FLOWS.map((x) => <button key={x.v} type="button" className="chip berry" aria-pressed={log.flow === x.v} onClick={() => set({ flow: log.flow === x.v ? undefined : x.v })}>{x.label}</button>)}
           </div>
@@ -416,11 +474,11 @@ export function LogDay() {
         </LogSection>
       )}
 
-      <LogSection title="Symptoms">
+      <LogSection id="log-symptoms" title="Symptoms" hint={common.length ? 'Ones you often log around this point in your cycle come first.' : undefined}>
         <div className="chips">
-          {SYMPTOMS.filter((x) => s.goal === 'perimenopause' || !['hot flush', 'night sweats'].includes(x) || log.symptoms?.includes(x)).map((x) => {
+          {orderedSymptoms.filter((x) => s.goal === 'perimenopause' || !['hot flush', 'night sweats'].includes(x) || log.symptoms?.includes(x)).map((x) => {
             const on = !!log.symptoms?.includes(x);
-            return <button key={x} type="button" className="chip" aria-pressed={on} onClick={() => set({ symptoms: on ? log.symptoms!.filter((y) => y !== x) : [...(log.symptoms ?? []), x] })}>{x}</button>;
+            return <button key={x} type="button" className="chip" aria-pressed={on} onClick={() => set({ symptoms: on ? log.symptoms!.filter((y) => y !== x) : [...(log.symptoms ?? []), x] })}>{common.includes(x) && <i className="hint-dot" aria-hidden="true" />}{x}</button>;
           })}
         </div>
         <div className="stack" style={{ '--gap': '6px' } as React.CSSProperties}>
@@ -434,12 +492,15 @@ export function LogDay() {
         </div>
       </LogSection>
 
-      <LogSection title="Mood & energy">
+      <LogSection id="log-mood" title="Mood & energy">
         <div className="chips">
           {MOODS.map((m) => <button key={m} type="button" className="chip" aria-pressed={log.mood === m} onClick={() => set({ mood: log.mood === m ? undefined : m })}>{m}</button>)}
         </div>
         <Scale label="Energy" value={log.energy} onChange={(v) => set({ energy: v })} />
-        <Scale label="Sleep quality" value={log.sleep} onChange={(v) => set({ sleep: v })} />
+      </LogSection>
+
+      <LogSection id="log-sleep" title="Sleep">
+        <Scale label="Sleep quality" value={log.sleep} onChange={(v) => set({ sleep: v })} lowHigh={['Poor', 'Great']} />
       </LogSection>
 
       {s.fertilitySigns && !data.pregnancy && (
@@ -482,21 +543,33 @@ export function LogDay() {
         />
       </LogSection>
 
-      <button className="btn block" onClick={() => { showToast('Saved on this device'); navigate('/app'); }}>Done</button>
+      <div className="saved-bar">
+        <span className="row" style={{ '--gap': '10px' } as React.CSSProperties}>
+          <span className="tick" aria-hidden="true"><Icon name="check" size={15} /></span>
+          <span className="small" aria-live="polite"><strong>{entryCount ? `${entryCount} ${entryCount === 1 ? 'entry' : 'entries'}` : 'Nothing yet'}</strong>{date === today ? ' today' : ''} · saved on this device</span>
+        </span>
+        <button className="btn" onClick={() => { showToast('Saved on this device'); navigate('/app'); }}>Done</button>
+      </div>
     </div>
   );
 }
 
-function LogSection({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+function countEntries(l?: DayLog): number {
+  if (!l) return 0;
+  const { date: _d, symptoms, ...rest } = l;
+  return (symptoms?.length ?? 0) + Object.values(rest).filter((v) => v !== undefined && v !== false && v !== '').length;
+}
+
+function LogSection({ id, title, hint, children }: { id?: string; title: string; hint?: string; children: React.ReactNode }) {
   return (
-    <section className="card stack" style={{ '--gap': '12px' } as React.CSSProperties}>
+    <section id={id} className="card stack" style={{ '--gap': '12px', scrollMarginTop: 16 } as React.CSSProperties}>
       <div><h3>{title}</h3>{hint && <p className="small faint">{hint}</p>}</div>
       {children}
     </section>
   );
 }
 
-function Scale({ label, value, onChange }: { label: string; value?: Level; onChange: (v?: Level) => void }) {
+function Scale({ label, value, onChange, lowHigh = ['Low', 'High'] }: { label: string; value?: Level; onChange: (v?: Level) => void; lowHigh?: [string, string] }) {
   return (
     <div className="stack" style={{ '--gap': '6px' } as React.CSSProperties}>
       <span className="label">{label}</span>
@@ -505,7 +578,7 @@ function Scale({ label, value, onChange }: { label: string; value?: Level; onCha
           <button key={n} type="button" aria-pressed={value === n} aria-label={`${label} ${n} of 5`} onClick={() => onChange(value === n ? undefined : n)}>{n}</button>
         ))}
       </div>
-      <div className="row between tiny faint"><span>Low</span><span>High</span></div>
+      <div className="row between tiny faint"><span>{lowHigh[0]}</span><span>{lowHigh[1]}</span></div>
     </div>
   );
 }

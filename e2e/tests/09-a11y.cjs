@@ -5,6 +5,7 @@ const L = require('../lib.cjs');
 const T = L.today();
 const ROUTES = ['/', '/plans', '/library', '/library/how-predictions-work', '/legal', '/help', '/privacy',
   '/app', '/app/calendar', '/app/log', '/app/fertility', '/app/pregnancy', '/app/insights', '/app/more',
+  '/app/you', '/app/share', '/app/recap', '/app/history',
   '/app/settings', '/app/privacy', '/app/membership', '/app/library', '/app/library/how-predictions-work'];
 /** Violation types already reported (A11Y-01, A11Y-02); anything else fails the sweep. */
 const KNOWN = new Set(['color-contrast', 'label-content-name-mismatch']);
