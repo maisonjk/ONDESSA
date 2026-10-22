@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Ondessa</string>
+    <string name="title_activity_main">Ondessa</string>
+    <string name="package_name">com.ondessa.app</string>
+    <string name="custom_url_scheme">com.ondessa.app</string>
+</resources>

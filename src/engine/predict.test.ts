@@ -1,0 +1,255 @@
+import { describe, expect, it } from 'vitest';
+import { addDays } from './dates';
+import { derivePeriods } from './cycles';
+import { classifyDay, confidenceFor, detectThermalShift, forecast, phaseOn, upcomingFertileWindow } from './predict';
+import { addLog, startsFromLengths, withPeriods } from './testkit';
+import { emptyData } from './types';
+
+describe('period detection', () => {
+  it('ignores spotting and joins short logging gaps', () => {
+    const data = emptyData('2026-01-01');
+    data.logs['2026-01-01'] = { date: '2026-01-01', flow: 'spotting' };
+    data.logs['2026-01-02'] = { date: '2026-01-02', flow: 'medium' };
+    data.logs['2026-01-05'] = { date: '2026-01-05', flow: 'light' }; // 2 unlogged days
+    data.logs['2026-01-20'] = { date: '2026-01-20', flow: 'light' };
+    const periods = derivePeriods(data.logs);
+    expect(periods.map((p) => [p.start, p.end])).toEqual([
+      ['2026-01-02', '2026-01-05'],
+      ['2026-01-20', '2026-01-20'],
+    ]);
+  });
+
+  it('never starts a new period within 10 days of the last one starting', () => {
+    const data = emptyData('2026-01-01');
+    for (const d of ['2026-09-01', '2026-09-02', '2026-09-03', '2026-09-06']) data.logs[d] = { date: d, flow: 'light' };
+    const periods = derivePeriods(data.logs);
+    expect(periods).toHaveLength(1);
+    expect(periods[0]).toMatchObject({ start: '2026-09-01', end: '2026-09-06' });
+  });
+});
+
+describe('forecast', () => {
+  it('has no prediction and says so when nothing is logged', () => {
+    const f = forecast(emptyData('2026-10-01'), '2026-10-22');
+    expect(f.nextPeriod).toBeUndefined();
+    expect(f.confidence).toBe('limited');
+    expect(f.explanation.join(' ')).toMatch(/Log the first day/);
+  });
+
+  it('uses the entered cycle length when only one period is logged', () => {
+    const data = withPeriods(['2026-10-01']);
+    data.settings.cycle.typicalCycleLength = 30;
+    const f = forecast(data, '2026-10-10');
+    expect(f.lengthSource).toBe('settings');
+    expect(f.nextPeriod?.expected).toBe('2026-10-31');
+    expect(f.confidence).toBe('limited');
+    expect(f.cycleDay).toBe(10);
+  });
+
+  it('blends history with settings below three cycles', () => {
+    const data = withPeriods(startsFromLengths('2026-07-01', [32, 32]));
+    data.settings.cycle.typicalCycleLength = 28;
+    const f = forecast(data, '2026-09-10');
+    expect(f.lengthSource).toBe('blended');
+    expect(f.predictedCycleLength).toBe(31); // (32+32+28)/3 = 30.67
+    expect(f.confidence).toBe('limited');
+  });
+
+  it('reaches developing at 3 cycles and established at 6 regular cycles', () => {
+    const three = withPeriods(startsFromLengths('2026-01-01', [28, 29, 27]));
+    expect(forecast(three, '2026-04-01').confidence).toBe('developing');
+    const six = withPeriods(startsFromLengths('2026-01-01', [28, 29, 27, 28, 30, 28]));
+    const f = forecast(six, '2026-07-01');
+    expect(f.confidence).toBe('established');
+    expect(f.predictedCycleLength).toBe(28);
+    expect(f.irregular).toBe(false);
+  });
+
+  it('never reaches established for irregular cycles and widens the window', () => {
+    const data = withPeriods(startsFromLengths('2026-01-01', [24, 38, 27, 41, 25, 35]));
+    const f = forecast(data, '2026-08-01');
+    expect(f.irregular).toBe(true);
+    expect(f.confidence).toBe('developing');
+    const width = (Date.parse(f.nextPeriod!.latest) - Date.parse(f.nextPeriod!.earliest)) / 86400000;
+    expect(width).toBeGreaterThanOrEqual(12);
+  });
+
+  it('excludes implausible cycles (e.g. a missed log) from predictions', () => {
+    const data = withPeriods(startsFromLengths('2026-01-01', [28, 28, 120, 28, 28]));
+    const f = forecast(data, '2026-10-01');
+    expect(f.usedCycleLengths).not.toContain(120);
+    expect(f.explanation.join(' ')).toMatch(/left out/);
+  });
+
+  it('reports days past the expected date without calling it a missed period', () => {
+    const data = withPeriods(['2026-09-01']);
+    const f = forecast(data, '2026-10-04');
+    expect(f.nextPeriod?.expected).toBe('2026-09-29');
+    expect(f.daysPastExpected).toBe(5);
+  });
+
+  it('estimates a calendar fertile window 14 days before the next period', () => {
+    const data = withPeriods(startsFromLengths('2026-01-01', [28, 28, 28]));
+    const f = forecast(data, '2026-03-30');
+    expect(f.nextPeriod?.expected).toBe('2026-04-23');
+    expect(f.ovulation?.expected).toBe('2026-04-09');
+    expect(f.ovulation?.method).toBe('calendar');
+    expect(f.fertile?.start).toBe('2026-04-04');
+    expect(f.fertile?.end).toBe('2026-04-10');
+  });
+
+  it('never starts the fertile window before the current cycle', () => {
+    const data = withPeriods(['2026-03-01']);
+    data.settings.cycle.typicalCycleLength = 18;
+    const f = forecast(data, '2026-03-03');
+    expect(f.fertile!.start >= '2026-03-01').toBe(true);
+    expect(f.ovulation!.earliest > f.lastPeriod!.end).toBe(true);
+  });
+
+  it('prefers a positive LH test over the calendar estimate', () => {
+    let data = withPeriods(['2026-05-01']);
+    data = addLog(data, { date: '2026-05-12', lh: 'negative' });
+    data = addLog(data, { date: '2026-05-13', lh: 'positive' });
+    const f = forecast(data, '2026-05-14');
+    expect(f.ovulation?.method).toBe('lh');
+    expect(f.ovulation?.expected).toBe('2026-05-14');
+    expect(f.explanation.join(' ')).toMatch(/does not confirm ovulation/);
+  });
+
+  it('handles a period that crosses a leap day', () => {
+    const data = withPeriods(['2028-01-31', '2028-02-28']);
+    const f = forecast(data, '2028-03-05');
+    expect(f.cycles[0]?.length).toBe(28);
+    expect(f.lastPeriod?.end).toBe('2028-03-03');
+  });
+
+  it('ignores logs dated in the future', () => {
+    const data = withPeriods(['2026-09-01', '2026-12-01']);
+    const f = forecast(data, '2026-09-10');
+    expect(f.lastPeriod?.start).toBe('2026-09-01');
+  });
+});
+
+describe('confidence rules', () => {
+  it('follows the documented thresholds', () => {
+    expect(confidenceFor(0, undefined)).toBe('limited');
+    expect(confidenceFor(2, 0)).toBe('limited');
+    expect(confidenceFor(3, 2)).toBe('developing');
+    expect(confidenceFor(6, 7)).toBe('established');
+    expect(confidenceFor(6, 8)).toBe('developing');
+    expect(confidenceFor(12, 3)).toBe('established');
+  });
+});
+
+describe('basal body temperature', () => {
+  const temps = (start: string, values: number[]) =>
+    values.map((bbt, i) => ({ date: addDays(start, i), bbt }));
+
+  it('detects a 3-over-6 thermal shift', () => {
+    const logs = temps('2026-05-06', [36.3, 36.4, 36.3, 36.35, 36.4, 36.3, 36.65, 36.7, 36.6]);
+    expect(detectThermalShift(logs)).toBe('2026-05-12');
+  });
+
+  it('does not report a shift from a single high reading', () => {
+    const logs = temps('2026-05-06', [36.3, 36.4, 36.3, 36.35, 36.4, 36.3, 36.8, 36.4, 36.7]);
+    expect(detectThermalShift(logs)).toBeUndefined();
+  });
+});
+
+describe('calendar classification', () => {
+  it('lets logged bleeding override predictions', () => {
+    const data = withPeriods(startsFromLengths('2026-01-01', [28, 28, 28]));
+    const f = forecast(data, '2026-03-30');
+    expect(classifyDay(f, data.logs, '2026-03-26', true)).toBe('period');
+    expect(classifyDay(f, data.logs, '2026-04-23', true)).toBe('predicted-period');
+    expect(classifyDay(f, data.logs, '2026-04-09', true)).toBe('ovulation');
+    expect(classifyDay(f, data.logs, '2026-04-09', false)).toBe('none');
+  });
+});
+
+describe('phases', () => {
+  const data = withPeriods(startsFromLengths('2026-01-01', [28, 28, 28]));
+  const f = forecast(data, '2026-03-30');
+
+  it('labels each part of the current cycle', () => {
+    expect(phaseOn(f, '2026-03-26')).toBe('menstrual');
+    expect(phaseOn(f, '2026-04-01')).toBe('follicular');
+    expect(phaseOn(f, '2026-04-04')).toBe('fertile');
+    expect(phaseOn(f, '2026-04-12')).toBe('luteal');
+    expect(phaseOn(f, '2026-04-23')).toBe('menstrual');
+    expect(phaseOn(f, '2026-05-10')).toBeUndefined();
+    expect(phaseOn(f, '2026-03-01')).toBeUndefined();
+  });
+
+  it('folds the fertile window away when fertility estimates are hidden', () => {
+    expect(phaseOn(f, '2026-04-08', false)).toBe('follicular');
+    expect(phaseOn(f, '2026-04-10', false)).toBe('luteal');
+  });
+
+  it('has no phase without a logged period', () => {
+    expect(phaseOn(forecast(emptyData('2026-01-01'), '2026-03-01'), '2026-03-01')).toBeUndefined();
+  });
+});
+
+describe('uncertainty and upcoming windows', () => {
+  it('marks the rest of the expected window as a possible period', () => {
+    const data = withPeriods(['2026-03-01']); // limited data: ±3 days
+    const f = forecast(data, '2026-03-05');
+    expect(f.nextPeriod).toMatchObject({ expected: '2026-03-29', earliest: '2026-03-26', latest: '2026-04-01' });
+    expect(classifyDay(f, data.logs, '2026-03-26', true)).toBe('possible-period');
+    expect(classifyDay(f, data.logs, '2026-03-29', true)).toBe('predicted-period');
+    expect(classifyDay(f, data.logs, '2026-04-05', true)).toBe('possible-period');
+  });
+
+  it('moves to the next fertile window once this one has passed', () => {
+    const data = withPeriods(startsFromLengths('2026-01-01', [28, 28, 28]));
+    const during = upcomingFertileWindow(forecast(data, '2026-04-08'));
+    expect(during).toMatchObject({ start: '2026-04-04', end: '2026-04-10', projected: false });
+    const after = upcomingFertileWindow(forecast(data, '2026-04-15'));
+    expect(after).toMatchObject({ ovulation: '2026-05-07', start: '2026-05-02', end: '2026-05-08', projected: true });
+  });
+});
+
+describe('phase with only a start date', () => {
+  it('assumes the usual period length instead of a one-day period', () => {
+    const data = emptyData('2026-01-01');
+    data.logs['2026-03-01'] = { date: '2026-03-01', flow: 'unspecified' };
+    const f = forecast(data, '2026-03-03');
+    expect(phaseOn(f, '2026-03-04')).toBe('menstrual');
+    expect(phaseOn(f, '2026-03-06')).toBe('follicular');
+  });
+});
+
+describe('code review regressions', () => {
+  it('keeps the established window at least half the observed variation', () => {
+    const data = withPeriods(startsFromLengths('2026-01-01', [25, 32, 25, 32, 25, 32]));
+    const f = forecast(data, '2026-07-01');
+    expect(f.confidence).toBe('established');
+    const width = (Date.parse(f.nextPeriod!.latest) - Date.parse(f.nextPeriod!.expected)) / 86400000;
+    expect(width).toBeGreaterThanOrEqual(4);
+  });
+
+  it('stops projecting once the whole window has passed', () => {
+    const data = withPeriods(['2026-06-01']);
+    const today = '2026-09-22';
+    const f = forecast(data, today);
+    expect(f.laterPeriods).toEqual([]);
+    expect(upcomingFertileWindow(f)).toBeUndefined();
+    expect(classifyDay(f, data.logs, '2026-06-29', true)).toBe('none');
+    expect(phaseOn(f, '2026-07-01')).toBeUndefined();
+  });
+
+  it('ignores logs dated after today', () => {
+    let data = withPeriods(['2026-05-01']);
+    data = addLog(data, { date: '2026-05-20', lh: 'positive' });
+    expect(forecast(data, '2026-05-10').ovulation?.method).toBe('calendar');
+  });
+
+  it('keeps short-cycle ovulation estimates ordered and after the period', () => {
+    const data = withPeriods(['2026-10-01']);
+    data.settings.cycle.typicalCycleLength = 18;
+    const o = forecast(data, '2026-10-03').ovulation!;
+    expect(o.earliest <= o.expected && o.expected <= o.latest).toBe(true);
+    expect(o.expected > '2026-10-05').toBe(true);
+  });
+});
