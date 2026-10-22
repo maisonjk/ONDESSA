@@ -6,17 +6,25 @@ import { addLog, startsFromLengths, withPeriods } from './testkit';
 import { emptyData } from './types';
 
 describe('period detection', () => {
-  it('ignores spotting and joins a one-day logging gap', () => {
+  it('ignores spotting and joins short logging gaps', () => {
     const data = emptyData('2026-01-01');
     data.logs['2026-01-01'] = { date: '2026-01-01', flow: 'spotting' };
     data.logs['2026-01-02'] = { date: '2026-01-02', flow: 'medium' };
-    data.logs['2026-01-04'] = { date: '2026-01-04', flow: 'light' };
-    data.logs['2026-01-10'] = { date: '2026-01-10', flow: 'light' };
+    data.logs['2026-01-05'] = { date: '2026-01-05', flow: 'light' }; // 2 unlogged days
+    data.logs['2026-01-20'] = { date: '2026-01-20', flow: 'light' };
     const periods = derivePeriods(data.logs);
     expect(periods.map((p) => [p.start, p.end])).toEqual([
-      ['2026-01-02', '2026-01-04'],
-      ['2026-01-10', '2026-01-10'],
+      ['2026-01-02', '2026-01-05'],
+      ['2026-01-20', '2026-01-20'],
     ]);
+  });
+
+  it('never starts a new period within 10 days of the last one starting', () => {
+    const data = emptyData('2026-01-01');
+    for (const d of ['2026-09-01', '2026-09-02', '2026-09-03', '2026-09-06']) data.logs[d] = { date: d, flow: 'light' };
+    const periods = derivePeriods(data.logs);
+    expect(periods).toHaveLength(1);
+    expect(periods[0]).toMatchObject({ start: '2026-09-01', end: '2026-09-06' });
   });
 });
 
@@ -209,5 +217,39 @@ describe('phase with only a start date', () => {
     const f = forecast(data, '2026-03-03');
     expect(phaseOn(f, '2026-03-04')).toBe('menstrual');
     expect(phaseOn(f, '2026-03-06')).toBe('follicular');
+  });
+});
+
+describe('code review regressions', () => {
+  it('keeps the established window at least half the observed variation', () => {
+    const data = withPeriods(startsFromLengths('2026-01-01', [25, 32, 25, 32, 25, 32]));
+    const f = forecast(data, '2026-07-01');
+    expect(f.confidence).toBe('established');
+    const width = (Date.parse(f.nextPeriod!.latest) - Date.parse(f.nextPeriod!.expected)) / 86400000;
+    expect(width).toBeGreaterThanOrEqual(4);
+  });
+
+  it('stops projecting once the whole window has passed', () => {
+    const data = withPeriods(['2026-06-01']);
+    const today = '2026-09-22';
+    const f = forecast(data, today);
+    expect(f.laterPeriods).toEqual([]);
+    expect(upcomingFertileWindow(f)).toBeUndefined();
+    expect(classifyDay(f, data.logs, '2026-06-29', true)).toBe('none');
+    expect(phaseOn(f, '2026-07-01')).toBeUndefined();
+  });
+
+  it('ignores logs dated after today', () => {
+    let data = withPeriods(['2026-05-01']);
+    data = addLog(data, { date: '2026-05-20', lh: 'positive' });
+    expect(forecast(data, '2026-05-10').ovulation?.method).toBe('calendar');
+  });
+
+  it('keeps short-cycle ovulation estimates ordered and after the period', () => {
+    const data = withPeriods(['2026-10-01']);
+    data.settings.cycle.typicalCycleLength = 18;
+    const o = forecast(data, '2026-10-03').ovulation!;
+    expect(o.earliest <= o.expected && o.expected <= o.latest).toBe(true);
+    expect(o.expected > '2026-10-05').toBe(true);
   });
 });

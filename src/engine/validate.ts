@@ -99,7 +99,11 @@ function sanitizeAppointment(raw: unknown): Appointment | undefined {
   return a;
 }
 
-export function sanitizeData(raw: unknown): AppData {
+/**
+ * Strict by default (imports). With `lenient`, used when loading the user's own stored data,
+ * a damaged individual entry is dropped instead of locking the user out of everything.
+ */
+export function sanitizeData(raw: unknown, opts: { lenient?: boolean } = {}): AppData {
   if (!isObj(raw)) throw new ValidationError('Not an Ondessa data file');
   if (raw.schemaVersion !== 1) throw new ValidationError('Unsupported data version');
   if (!isISODate(raw.createdOn)) throw new ValidationError('Missing creation date');
@@ -107,9 +111,13 @@ export function sanitizeData(raw: unknown): AppData {
 
   const logs: Record<ISODate, DayLog> = {};
   for (const [key, value] of Object.entries(raw.logs)) {
-    const log = sanitizeLog(value);
-    if (log.date !== key) throw new ValidationError('Log key does not match its date');
-    logs[key] = log;
+    try {
+      const log = sanitizeLog(value);
+      if (log.date !== key) throw new ValidationError('Log key does not match its date');
+      logs[key] = log;
+    } catch (e) {
+      if (!opts.lenient) throw e;
+    }
   }
   const data: AppData = {
     schemaVersion: 1,

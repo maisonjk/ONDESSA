@@ -21,7 +21,7 @@ export interface EntitlementPayload {
 export type Entitlement =
   | { status: 'active'; plan: Plan; expires: number; eid: string; preview?: false }
   | { status: 'active'; plan: 'preview'; expires: number; preview: true }
-  | { status: 'expired' | 'none' | 'invalid' };
+  | { status: 'loading' | 'expired' | 'none' | 'invalid' };
 
 const STORAGE_KEY = 'ondessa.entitlement';
 /** Renewals sync within this window; avoids locking someone out mid-renewal. */
@@ -59,7 +59,8 @@ export async function verifyToken(
     if (p.v !== 1 || (p.plan !== 'monthly' && p.plan !== 'annual') || typeof p.exp !== 'number' || typeof p.eid !== 'string') {
       return { status: 'invalid' };
     }
-    if (p.iat > nowSeconds + 300) return { status: 'invalid' };
+    // Allow a day of clock skew: phones with a slow clock must not lose access.
+    if (p.iat > nowSeconds + 86_400) return { status: 'invalid' };
     if (p.exp + GRACE_SECONDS < nowSeconds) return { status: 'expired' };
     return { status: 'active', plan: p.plan, expires: p.exp, eid: p.eid };
   } catch {
@@ -96,7 +97,23 @@ export async function currentEntitlement(): Promise<Entitlement> {
       : { status: 'expired' };
   }
   const key = configuredPublicKey();
-  return key ? verifyToken(stored, key) : { status: 'invalid' };
+  return key ? verifyToken(stored, key, trustedNow()) : { status: 'invalid' };
+}
+
+/**
+ * Never let "now" go backwards: winding the device clock back must not revive an expired
+ * membership. Stores only the latest time seen.
+ */
+function trustedNow(): number {
+  const now = Math.floor(Date.now() / 1000);
+  try {
+    const seen = Number(localStorage.getItem('ondessa.seen') ?? 0);
+    const t = Math.max(now, Number.isFinite(seen) ? seen : 0);
+    localStorage.setItem('ondessa.seen', String(t));
+    return t;
+  } catch {
+    return now;
+  }
 }
 
 export async function activateToken(token: string): Promise<Entitlement> {

@@ -29,7 +29,7 @@ export function Fertility() {
     ? Object.values(data.logs).filter((l) => l.date >= f.lastPeriod!.start && l.date <= today).sort((a, b) => (a.date < b.date ? -1 : 1))
     : [];
   const temps = cycleLogs.filter((l) => l.bbt !== undefined);
-  const shift = detectThermalShift(cycleLogs);
+  const shift = f.ovulation?.bbtShiftOn ?? (f.ovulation?.method === 'bbt' ? undefined : detectThermalShift(cycleLogs.filter((l) => l.date > f.lastPeriod!.end)));
   const methodCopy = {
     calendar: 'Calendar estimate from your cycle history',
     lh: 'Refined by your positive LH test',
@@ -149,7 +149,7 @@ export function PregnancyView() {
       <div className="stack" style={{ '--gap': '16px', maxWidth: 640 } as React.CSSProperties}>
         <PageTitle eyebrow="Pregnancy mode" title="Switch to pregnancy mode">Pauses cycle predictions and shows a week-by-week calendar. Your cycle history is kept, and you can switch back anytime.</PageTitle>
         <div className="card stack" style={{ '--gap': '12px' } as React.CSSProperties}>
-          <div className="field"><label htmlFor="pdue">Due date from your clinician (most accurate)</label><input id="pdue" className="input" type="date" min={today} value={due} onChange={(e) => setDue(e.target.value)} /></div>
+          <div className="field"><label htmlFor="pdue">Due date from your clinician (most accurate)</label><input id="pdue" className="input" type="date" min={today} max={addDays(today, 280)} value={due} onChange={(e) => setDue(e.target.value)} /></div>
           <div className="field"><label htmlFor="plmp">Or first day of your last period</label><input id="plmp" className="input" type="date" max={today} value={lmp} onChange={(e) => setLmp(e.target.value)} /></div>
           {lmp && !due && <p className="small muted">Estimated due date: {formatLong(dueDateFromLmp(lmp, data.settings.cycle.typicalCycleLength))}</p>}
           <button className="btn" disabled={!lmp && !due} onClick={() => update((d) => ({ ...d, settings: { ...d.settings, goal: 'pregnant' }, pregnancy: { startedOn: today, ...(lmp ? { lmp } : {}), ...(due ? { clinicianDueDate: due } : {}) } }))}>Start pregnancy mode</button>
@@ -463,7 +463,7 @@ export function PrivacyCenter() {
         <div className="row wrap-row">
           <input className="input pin" style={{ maxWidth: 200 }} type="password" inputMode="numeric" autoComplete="new-password" placeholder={locked ? 'New passcode' : '4–8 digits'} aria-label="Passcode" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))} />
           <button className="btn" disabled={tour || !/^\d{4,8}$/.test(pin)} onClick={async () => { await setPasscode(pin); setPin(''); showToast(locked ? 'Passcode changed' : 'Passcode on: data encrypted'); }}>{locked ? 'Change' : 'Turn on'}</button>
-          {locked && <button className="btn secondary" onClick={async () => { if (window.confirm('Turn off the passcode? Your data will be stored unencrypted on this device.')) { await setPasscode(undefined); showToast('Passcode off'); } }}>Turn off</button>}
+          {locked && <button className="btn secondary" disabled={tour} onClick={async () => { if (window.confirm('Turn off the passcode? Your data will be stored unencrypted on this device.')) { await setPasscode(undefined); showToast('Passcode off'); } }}>Turn off</button>}
         </div>
       </section>
 

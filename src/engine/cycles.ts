@@ -19,8 +19,9 @@ export interface Cycle {
 }
 
 /**
- * Groups bleeding days into periods. Spotting never starts a period, and a gap of up to
- * RULES.periodGapTolerance unlogged days inside a period is treated as one period.
+ * Groups bleeding days into periods. Spotting never starts a period. A gap of up to
+ * RULES.periodGapTolerance unlogged days, or any bleeding within RULES.periodMergeWindow
+ * days of the period's start, counts as the same period.
  */
 export function derivePeriods(logs: Record<ISODate, DayLog>): Period[] {
   const bleedDays = Object.values(logs)
@@ -31,7 +32,11 @@ export function derivePeriods(logs: Record<ISODate, DayLog>): Period[] {
   const periods: Period[] = [];
   for (const day of bleedDays) {
     const last = periods[periods.length - 1];
-    if (last && diffDays(last.end, day) <= RULES.periodGapTolerance + 1) {
+    const sameBleed = last && (
+      diffDays(last.end, day) <= RULES.periodGapTolerance + 1 ||
+      diffDays(last.start, day) < RULES.periodMergeWindow
+    );
+    if (last && sameBleed) {
       last.end = day;
       last.length = diffDays(last.start, day) + 1;
     } else {

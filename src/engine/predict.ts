@@ -1,5 +1,5 @@
 import {
-  addDays, diffDays, formatShort, maxDate, type ISODate,
+  addDays, diffDays, formatShort, maxDate, minDate, type ISODate,
 } from './dates';
 import { deriveCycles, derivePeriods, median, type Cycle, type Period } from './cycles';
 import { RULES } from './rules';
@@ -134,11 +134,14 @@ export function forecast(data: AppData, today: ISODate): Forecast {
   const cycleDay = diffDays(lastPeriod.start, today) + 1;
   const inPeriod = today >= lastPeriod.start && today <= lastPeriod.end;
 
-  let halfWidth: number = RULES.windowHalfWidth[confidence];
-  if (irregular && variation !== undefined) {
-    halfWidth = Math.max(halfWidth, Math.min(RULES.irregularHalfWidthCap, Math.ceil(variation / 2)));
+  // The window is never narrower than half the variation actually observed.
+  const baseWidth: number = RULES.windowHalfWidth[confidence];
+  const halfWidth = variation === undefined
+    ? baseWidth
+    : Math.max(baseWidth, Math.min(RULES.irregularHalfWidthCap, Math.ceil(variation / 2)));
+  if (halfWidth > baseWidth && variation !== undefined) {
     explanation.push(
-      `Your recent cycles vary by ${variation} days, so the expected window is wider (±${halfWidth} days).`,
+      `Your recent cycles vary by ${variation} days, so the expected window is ${irregular ? 'wider' : 'set'} at ±${halfWidth} days.`,
     );
   } else {
     explanation.push(
@@ -157,14 +160,16 @@ export function forecast(data: AppData, today: ISODate): Forecast {
     `Your next period is projected for ${formatShort(expected)}, ${predictedCycleLength} days after your last period started on ${formatShort(lastPeriod.start)}.`,
   );
 
+  // Once the whole window has passed without a period, later projections would be fiction.
+  const overdue = today > nextPeriod.latest;
   const laterPeriods: DateWindow[] = [];
-  for (let k = 1; k <= 3; k++) {
+  for (let k = 1; k <= (overdue ? 0 : 3); k++) {
     const e = addDays(expected, predictedCycleLength * k);
     const hw = Math.min(halfWidth + k, RULES.irregularHalfWidthCap + 2);
     laterPeriods.push({ expected: e, earliest: addDays(e, -hw), latest: addDays(e, hw) });
   }
 
-  const ovulation = estimateOvulation(data.logs, lastPeriod, nextPeriod, explanation);
+  const ovulation = estimateOvulation(data.logs, lastPeriod, nextPeriod, today, explanation);
   const fertile = {
     start: maxDate(addDays(ovulation.expected, -RULES.fertileBefore), lastPeriod.start),
     end: addDays(ovulation.expected, RULES.fertileAfter),
@@ -182,10 +187,11 @@ function estimateOvulation(
   logs: Record<ISODate, DayLog>,
   lastPeriod: Period,
   next: DateWindow,
+  today: ISODate,
   explanation: string[],
 ): NonNullable<Forecast['ovulation']> {
   const cycleLogs = Object.values(logs)
-    .filter((l) => l.date > lastPeriod.end && l.date < next.latest)
+    .filter((l) => l.date > lastPeriod.end && l.date < next.latest && l.date <= today)
     .sort((a, b) => (a.date < b.date ? -1 : 1));
 
   const bbtShiftOn = detectThermalShift(cycleLogs);
@@ -206,14 +212,17 @@ function estimateOvulation(
     return { expected, earliest: addDays(bbtShiftOn, -2), latest: bbtShiftOn, method: 'bbt', bbtShiftOn };
   }
 
-  const expected = addDays(next.expected, -RULES.lutealDays);
+  // Very short cycles: ovulation can't be estimated inside the period itself.
+  const expected = maxDate(addDays(next.expected, -RULES.lutealDays), addDays(lastPeriod.end, 1));
   explanation.push(
     `Ovulation is estimated ${RULES.lutealDays} days before your next expected period. The phase after ovulation usually lasts ${RULES.lutealRange.min}–${RULES.lutealRange.max} days, so this is an estimate, not a confirmation.`,
   );
+  const earliest = maxDate(addDays(next.earliest, -RULES.lutealRange.max), addDays(lastPeriod.end, 1));
+  const latest = addDays(next.latest, -RULES.lutealRange.min);
   return {
     expected,
-    earliest: maxDate(addDays(next.earliest, -RULES.lutealRange.max), addDays(lastPeriod.end, 1)),
-    latest: addDays(next.latest, -RULES.lutealRange.min),
+    earliest: minDate(earliest, expected),
+    latest: maxDate(latest, expected),
     method: 'calendar',
   };
 }
@@ -249,7 +258,8 @@ export function classifyDay(
   if (f.periods.some((p) => date >= p.start && date <= p.end)) return 'period';
 
   const windows = f.nextPeriod ? [f.nextPeriod, ...f.laterPeriods] : [];
-  const afterLastPeriod = date > (f.lastPeriod?.end ?? '');
+  // Predictions are only shown for today onwards; past days show what was logged.
+  const afterLastPeriod = date > (f.lastPeriod?.end ?? '') && date >= f.today;
   for (const w of windows) {
     const end = addDays(w.expected, f.predictedPeriodLength - 1);
     if (afterLastPeriod && date >= w.expected && date <= end) return 'predicted-period';
@@ -294,6 +304,7 @@ export function phaseOn(f: Forecast, date: ISODate, showFertility = true): Phase
   const periodEnd = f.lastPeriod.length > 1 ? f.lastPeriod.end : addDays(f.lastPeriod.start, f.predictedPeriodLength - 1);
   if (date <= periodEnd) return 'menstrual';
   if (date >= f.nextPeriod.expected) {
+    if (date < f.today) return undefined; // past days with no period logged
     return date < addDays(f.nextPeriod.expected, f.predictedPeriodLength) ? 'menstrual' : undefined;
   }
   if (date < f.fertile.start) return 'follicular';
@@ -315,6 +326,7 @@ export function upcomingFertileWindow(
   if (f.today <= f.fertile.end) {
     return { start: f.fertile.start, end: f.fertile.end, ovulation: f.ovulation.expected, projected: false };
   }
+  if (f.today > f.nextPeriod.latest) return undefined; // overdue: the next cycle's timing is unknown
   const ovulation = addDays(f.nextPeriod.expected, f.predictedCycleLength - RULES.lutealDays);
   return {
     start: addDays(ovulation, -RULES.fertileBefore),

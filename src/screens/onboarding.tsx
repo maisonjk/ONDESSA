@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { navigate } from '../app/router';
 import { useStore } from '../app/store';
 import { addDays, emptyData, type Goal } from '../engine';
@@ -124,7 +124,7 @@ export function Onboarding() {
             <h1 style={{ fontSize: 'clamp(1.8rem, 6vw, 2.4rem)' }}>Let’s find your week.</h1>
             <div className="field">
               <label htmlFor="due">Due date from your clinician (most accurate)</label>
-              <input id="due" className="input" type="date" min={today} max={addDays(today, 300)} value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+              <input id="due" className="input" type="date" min={today} max={addDays(today, 280)} value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
             </div>
             <div className="field">
               <label htmlFor="lmp">Or the first day of your last period</label>
@@ -185,13 +185,32 @@ export function LockScreen() {
   const [busy, setBusy] = useState(false);
   const [forgot, setForgot] = useState(false);
   const [armed, setArmed] = useState(false);
+  const [failures, setFailures] = useState(0);
+  const [waitUntil, setWaitUntil] = useState(0);
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (waitUntil <= Date.now()) return;
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [waitUntil]);
+  const waiting = Math.max(0, Math.ceil((waitUntil - now) / 1000));
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (waiting) return;
     setBusy(true);
     const ok = await unlockWith(pin);
     setBusy(false);
     setError(!ok);
-    if (!ok) setPin('');
+    if (!ok) {
+      setPin('');
+      const n = failures + 1;
+      setFailures(n);
+      // After 5 wrong tries, wait 30s, doubling each time (capped at 15 minutes).
+      if (n >= 5) {
+        setWaitUntil(Date.now() + Math.min(15 * 60, 30 * 2 ** (n - 5)) * 1000);
+        setNow(Date.now());
+      }
+    }
   };
   return (
     <div className="lock-screen">
@@ -199,8 +218,8 @@ export function LockScreen() {
         <span style={{ color: 'var(--berry)', margin: '0 auto' }}><Mark size={40} /></span>
         <h2>Welcome back</h2>
         <input className="input pin" type="password" inputMode="numeric" autoFocus autoComplete="current-password" aria-label="Passcode" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))} />
-        {error && <p className="small" role="alert" style={{ color: 'var(--berry-ink)' }}>That passcode didn’t work.</p>}
-        <button className="btn block" disabled={pin.length < 4 || busy}>{busy ? 'Unlocking…' : 'Unlock'}</button>
+        {error && <p className="small" role="alert" style={{ color: 'var(--berry-ink)' }}>{waiting ? `Too many attempts. Try again in ${waiting}s.` : 'That passcode didn’t work.'}</p>}
+        <button className="btn block" disabled={pin.length < 4 || busy || waiting > 0}>{busy ? 'Unlocking…' : 'Unlock'}</button>
         {!forgot ? (
           <button type="button" className="btn ghost" onClick={() => setForgot(true)}>Forgot passcode?</button>
         ) : (

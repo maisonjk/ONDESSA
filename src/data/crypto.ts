@@ -49,6 +49,46 @@ async function deriveKey(passphrase: string, salt: Uint8Array<ArrayBuffer>, iter
   );
 }
 
+/**
+ * A derived key held in memory for the unlocked session, so edits don't re-run the
+ * key derivation. Every encryption still uses a fresh random IV (safe for AES-GCM).
+ */
+export interface KeyInfo {
+  key: CryptoKey;
+  salt: string;
+  iterations: number;
+}
+
+export async function deriveKeyInfo(passphrase: string, salt?: string, iterations = KDF_ITERATIONS): Promise<KeyInfo> {
+  const saltBytes = salt ? fromB64(salt) : crypto.getRandomValues(new Uint8Array(16));
+  return { key: await deriveKey(passphrase, saltBytes, iterations), salt: toB64(saltBytes), iterations };
+}
+
+export async function encryptWithKey(value: unknown, k: KeyInfo): Promise<Envelope> {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, k.key, enc.encode(JSON.stringify(value)));
+  return {
+    format: 'ondessa-aes-gcm', v: 1, kdf: 'PBKDF2-SHA256',
+    iterations: k.iterations, salt: k.salt, iv: toB64(iv), ciphertext: toB64(new Uint8Array(ct)),
+  };
+}
+
+export async function decryptWithKey(envelope: Envelope, k: KeyInfo): Promise<unknown> {
+  if (envelope.salt !== k.salt || envelope.iterations !== k.iterations) throw new WrongPassphraseError();
+  try {
+    const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromB64(envelope.iv) }, k.key, fromB64(envelope.ciphertext));
+    return JSON.parse(dec.decode(pt));
+  } catch {
+    throw new WrongPassphraseError();
+  }
+}
+
+/** Unlock an envelope with a passphrase and keep the derived key for later saves. */
+export async function openEnvelope(envelope: Envelope, passphrase: string): Promise<{ value: unknown; key: KeyInfo }> {
+  const key = await deriveKeyInfo(passphrase, envelope.salt, envelope.iterations);
+  return { value: await decryptWithKey(envelope, key), key };
+}
+
 export async function encryptJSON(
   value: unknown,
   passphrase: string,

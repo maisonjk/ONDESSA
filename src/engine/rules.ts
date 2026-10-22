@@ -8,7 +8,12 @@ export const RULES = {
   version: '2026.10-provisional',
 
   /** Unlogged days allowed inside one period before a new period is assumed. PROVISIONAL. */
-  periodGapTolerance: 1,
+  periodGapTolerance: 2,
+  /**
+   * Bleeding that starts within this many days of a period's first day belongs to that
+   * period: a new cycle cannot plausibly begin that soon, so it is a missed log. PROVISIONAL.
+   */
+  periodMergeWindow: 10,
 
   /** Cycles outside this range are shown but excluded from predictions. PROVISIONAL. */
   plausibleCycle: { min: 15, max: 90 },

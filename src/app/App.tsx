@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { Component, useEffect, type ReactNode } from 'react';
 import { upcomingReminders } from '../engine';
 import { AppShell, Calendar, Home, LogDay } from '../screens/app-core';
 import { Fertility, Insights, Membership, More, PregnancyView, PrivacyCenter, Settings } from '../screens/app-more';
@@ -10,10 +10,24 @@ import { navigate, usePath } from './router';
 import { useStore } from './store';
 
 export function App() {
+  return (
+    <ErrorBoundary>
+      <Routes />
+    </ErrorBoundary>
+  );
+}
+
+function Routes() {
   const path = usePath();
   const store = useStore();
-  const { phase, data, entitlement, tour } = store;
+  const { phase, data, entitlement, tour, exitTour } = store;
   useOpenNotification();
+
+  // The tour lives only inside the app screens; leaving them ends it, so nothing that
+  // writes to storage (setup, restore, delete) can ever run on sample data.
+  useEffect(() => {
+    if (tour && !path.startsWith('/app')) exitTour();
+  }, [tour, path, exitTour]);
 
   if (phase === 'loading') return <div className="lock-screen" aria-busy="true" />;
   if (phase === 'unavailable' && !tour) return <Unavailable message={store.storageError} />;
@@ -32,6 +46,7 @@ export function App() {
   if (path.startsWith('/app')) {
     if (!tour) {
       if (!data) return <Redirect to="/start" />;
+      if (entitlement.status === 'loading') return <div className="lock-screen" aria-busy="true" />;
       if (entitlement.status !== 'active') return <Redirect to="/plans" />;
     }
     return <AppShell path={path}>{appScreen(path)}</AppShell>;
@@ -81,4 +96,29 @@ function useOpenNotification() {
       /* notifications or storage unavailable */
     }
   }, [data, forecast, today, tour, phase]);
+}
+
+/** Any rendering error shows a recovery screen instead of a blank page. Data is untouched. */
+class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <div className="lock-screen">
+        <div className="card stack" style={{ '--gap': '14px', maxWidth: 440 } as React.CSSProperties} role="alert">
+          <h2>Something went wrong</h2>
+          <p className="muted">Ondessa hit an unexpected problem showing this screen. Your data has not been changed.</p>
+          <div className="row wrap-row">
+            <button className="btn" onClick={() => window.location.reload()}>Reload</button>
+            <button className="btn secondary" onClick={() => { window.location.hash = '#/app'; window.location.reload(); }}>Go to Today</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 }

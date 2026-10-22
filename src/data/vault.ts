@@ -1,5 +1,5 @@
 import { sanitizeData, type AppData } from '../engine';
-import { decryptJSON, encryptJSON, isEnvelope, type Envelope } from './crypto';
+import { decryptWithKey, encryptWithKey, isEnvelope, openEnvelope, type Envelope, type KeyInfo } from './crypto';
 
 /**
  * Local-first storage. All health data lives in one IndexedDB record on this device,
@@ -47,16 +47,22 @@ export async function readStored(): Promise<Stored | undefined> {
 }
 
 export async function loadPlain(stored: Stored & { mode: 'plain' }): Promise<AppData> {
-  return sanitizeData(stored.data);
+  return sanitizeData(stored.data, { lenient: true });
 }
 
-export async function unlock(stored: Stored & { mode: 'locked' }, passcode: string): Promise<AppData> {
-  return sanitizeData(await decryptJSON(stored.envelope, passcode));
+export async function unlock(stored: Stored & { mode: 'locked' }, passcode: string): Promise<{ data: AppData; key: KeyInfo }> {
+  const { value, key } = await openEnvelope(stored.envelope, passcode);
+  return { data: sanitizeData(value, { lenient: true }), key };
 }
 
-export async function save(data: AppData, passcode?: string): Promise<void> {
-  const value: Stored = passcode
-    ? { mode: 'locked', envelope: await encryptJSON(data, passcode) }
+/** Re-read a locked record with a key already held in memory (e.g. after another tab saved). */
+export async function reloadWithKey(stored: Stored & { mode: 'locked' }, key: KeyInfo): Promise<AppData> {
+  return sanitizeData(await decryptWithKey(stored.envelope, key), { lenient: true });
+}
+
+export async function save(data: AppData, key?: KeyInfo): Promise<void> {
+  const value: Stored = key
+    ? { mode: 'locked', envelope: await encryptWithKey(data, key) }
     : { mode: 'plain', data };
   await tx('readwrite', (s) => s.put(value, KEY));
 }

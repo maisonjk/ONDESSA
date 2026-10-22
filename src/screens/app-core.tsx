@@ -473,7 +473,7 @@ export function LogDay() {
       <LogSection title="Note">
         <textarea
           key={date} className="input" maxLength={2000} defaultValue={log.note ?? ''} aria-label="Private note" placeholder="Anything you want to remember. Stays on this device."
-          onBlur={(e) => set({ note: e.target.value.trim() || undefined })}
+          onChange={(e) => set({ note: e.target.value.trim() ? e.target.value : undefined })}
         />
       </LogSection>
 
