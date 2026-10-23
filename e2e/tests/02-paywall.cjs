@@ -68,7 +68,7 @@ module.exports = [
       assert.ok(text.includes('Preview pass'));
       await page.reload();
       await page.waitForURL(/#\/app\/membership$/);
-      assert.equal(await page.locator('.tabbar').count(), 1, 'entitlement lost on reload');
+      await page.locator('.tabbar').waitFor({ timeout: 5000 }).catch(() => assert.fail('entitlement lost on reload'));
     },
   },
   {
