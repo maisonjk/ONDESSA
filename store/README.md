@@ -2,7 +2,7 @@
 
 Everything App Store Connect and Google Play Console ask for, in the order they ask for it. Listing text lives in `fastlane/metadata/` (every field is already inside its character limit), images live here in `store/`.
 
-> **Before you paste anything:** the URLs below use `ondessa.app` as a placeholder. Buy the domain (or swap in yours), point it at the Vercel deployment, and update `src/content/company.ts`. Apple rejects listings whose support or privacy URL does not load.
+> **URLs:** the store listing uses the free Vercel address (https://v0-recreate-ui-from-screenshot-f8.vercel.app). If you buy a custom domain later, point it at the Vercel project and replace the address in `src/content/company.ts` and `fastlane/metadata`. Apple rejects listings whose support or privacy URL does not load.
 
 ## 1. Images
 
@@ -18,7 +18,7 @@ The app is set to iPhone only, so no iPad screenshots are needed. Every screen i
 
 Upload in numbered order. Slide 1 is what most people see in search, so it carries the core promise.
 
-Regenerate after any design or content change, and again after clinical sign-off so the pregnancy slide shows "Reviewed by" instead of "Clinical review in progress":
+Regenerate after any design or content change:
 
 ```
 npm run store:assets
@@ -85,7 +85,7 @@ To review:
 
 Ondessa is not a medical device and says so on the Today screen, in onboarding and in the Terms. Predictions are estimates with visible confidence levels; the app never claims to confirm ovulation or pregnancy and is not contraception.
 
-Health content was reviewed by <clinician name, credentials>.
+Health content is general information with sources listed on every article; it is not presented as medical advice.
 Contact: <name, phone, email>
 ```
 

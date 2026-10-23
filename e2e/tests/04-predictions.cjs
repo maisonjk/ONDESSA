@@ -196,11 +196,13 @@ module.exports = [
       assert.ok(!(await page.locator('main').innerText()).includes('Your period may start'), 'period reminder while pregnant');
       await L.hashGo(page, '/app/pregnancy');
       await page.getByRole('button', { name: 'End pregnancy mode' }).click();
+      assert.match(await page.getByRole('alertdialog').innerText(), /Nothing is deleted/);
+      await page.getByRole('button', { name: 'Yes, end pregnancy mode' }).click();
       await L.settle(page);
       v = (await L.readVault(page)).data;
       assert.equal(v.pregnancy, undefined);
       assert.equal(v.pastPregnancies.length, 1);
-      assert.ok(mon.dialogs.some((m) => m.startsWith('End pregnancy mode?')));
+      assert.equal(mon.dialogs.length, 0, 'no system dialog for ending pregnancy mode');
       await L.hashGo(page, '/app');
       assert.equal(await page.locator('.phase-hero').count(), 1, 'cycle tracking resumes');
     },
@@ -249,7 +251,8 @@ module.exports = [
       await L.seed(page, L.emptyData(T, {}));
       const expect = {
         '/app': 'Log your period to begin', '/app/calendar': 'October', '/app/fertility': 'No estimate yet',
-        '/app/insights': 'What your logs show', '/app/pregnancy': 'Switch to pregnancy mode', '/app/settings': 'Reminders & settings',
+        '/app/insights': 'Your first patterns arrive in 3 cycles', '/app/you': 'Stored only on this device', '/app/share': 'Keep someone in the loop',
+        '/app/recap': 'Your first recap is on its way', '/app/history': 'Log your most recent period first', '/app/pregnancy': 'Switch to pregnancy mode', '/app/settings': 'Reminders & settings',
         '/app/privacy': 'Your data, your rules', '/app/log': L.formatLong(T),
       };
       expect['/app/calendar'] = MONTHS[Number(T.slice(5, 7)) - 1];

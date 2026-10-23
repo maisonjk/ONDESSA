@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const L = require('../lib.cjs');
 
 const T = L.today();
-const APP_ROUTES = ['/app', '/app/calendar', '/app/log', '/app/fertility', '/app/pregnancy', '/app/insights', '/app/more', '/app/settings', '/app/privacy', '/app/membership', '/app/library'];
+const APP_ROUTES = ['/app', '/app/calendar', '/app/log', '/app/fertility', '/app/pregnancy', '/app/insights', '/app/more', '/app/you', '/app/share', '/app/recap', '/app/history', '/app/settings', '/app/privacy', '/app/membership', '/app/library'];
 
 module.exports = [
   {
@@ -19,16 +19,28 @@ module.exports = [
     },
   },
   {
-    name: 'data but no membership: every /app route (deep link and reload) redirects to /plans',
+    name: 'data but no membership: /app routes redirect to /plans, except Privacy center and Membership (own data stays reachable)',
     async run() {
       const { page } = await L.open();
       await L.seed(page, L.emptyData(T, { logs: L.addPeriod({}, L.addDays(T, -3)) }), { entitled: false, route: '/plans' });
+      const open = ['/app/privacy', '/app/membership'];
       for (const r of APP_ROUTES) {
         await page.evaluate((r) => history.replaceState(null, '', `#${r}`), r);
         await page.reload();
-        await page.waitForURL(/#\/plans$/);
-        assert.equal(await page.locator('.tabbar').count(), 0, `${r} rendered the app shell`);
+        if (open.includes(r)) {
+          await page.waitForFunction(() => !document.querySelector('[aria-busy="true"]'));
+          await page.waitForTimeout(150);
+          assert.ok(page.url().endsWith(`#${r}`), `${r} should stay reachable without a membership`);
+          assert.match(await page.locator('[role=note]').innerText(), /data is still yours/);
+        } else {
+          await page.waitForURL(/#\/plans$/);
+        }
+        assert.equal(await page.locator('.tabbar').count(), 0, `${r} rendered the full app shell`);
       }
+      await L.hashGo(page, '/plans');
+      await page.getByRole('link', { name: /Your data stays yours/ }).click();
+      await page.waitForURL(/#\/app\/privacy$/);
+      assert.equal(await page.getByRole('button', { name: 'Permanently delete' }).count(), 1);
     },
   },
   {
@@ -56,7 +68,7 @@ module.exports = [
       assert.ok(text.includes('Preview pass'));
       await page.reload();
       await page.waitForURL(/#\/app\/membership$/);
-      assert.equal(await page.locator('.tabbar').count(), 1, 'entitlement lost on reload');
+      await page.locator('.tabbar').waitFor({ timeout: 5000 }).catch(() => assert.fail('entitlement lost on reload'));
     },
   },
   {

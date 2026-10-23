@@ -6,14 +6,15 @@ import { notificationPermission, requestNotificationPermission } from '../platfo
 import { manageSubscription, restorePurchases } from '../platform/purchases';
 import { Link, navigate } from '../app/router';
 import { useStore } from '../app/store';
-import { PREGNANCY_WEEKS_REVIEW, weekNotes } from '../content/library';
+import { weekNotes } from '../content/library';
 import { BackupNeedsPassword, makeBackup, readBackup } from '../data/backup';
 import { WrongPassphraseError } from '../data/crypto';
 import {
-  CONFIDENCE_COPY, RULES, addDays, localToday, upcomingFertileWindow, detectThermalShift, dueDateFromLmp, formatLong, formatRange, formatShort,
+  CONFIDENCE_COPY, RULES, addDays, lastCycleRecap, accuracyHeadline, median, localToday, upcomingFertileWindow, detectThermalShift, dueDateFromLmp, formatLong, formatRange, formatShort,
   pregnancyStatus, upcomingReminders, type AppData, type Confidence, type Goal,
 } from '../engine';
-import { ConfidenceBadge, Icon, MedicalNote, PageTitle, Segmented, Toast, ToggleRow, useToast } from '../ui/components';
+import { ConfidenceBadge, EvidenceStrip, Icon, MedicalNote, PageTitle, Segmented, Toast, ToggleRow, useToast } from '../ui/components';
+import { getTheme, setTheme, type ThemeChoice } from '../ui/theme';
 import { Stepper } from './onboarding';
 
 /* ------------------------------------------------------------------ Fertility */
@@ -140,8 +141,13 @@ function TestDatePicker({ suggested }: { suggested?: string }) {
 
 /* ------------------------------------------------------------------ Pregnancy */
 
-export function PregnancyView() {
+/**
+ * Pregnancy dashboard. Also rendered on Today in pregnancy mode, where `journal` replaces
+ * the journal card with one-tap log tiles.
+ */
+export function PregnancyView({ journal }: { journal?: React.ReactNode } = {}) {
   const { data, update, today } = useStore();
+  const [ending, setEnding] = useState(false);
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
   const [lmp, setLmp] = useState('');
@@ -152,7 +158,7 @@ export function PregnancyView() {
   const lmpOk = !!lmp && lmp <= today && lmp >= addDays(today, -300);
   const datesForm = (label: string, apply: () => void) => (
     <div className="card stack" style={{ '--gap': '12px' } as React.CSSProperties}>
-      <div className="field"><label htmlFor="pdue">Due date from your clinician (most accurate)</label><input id="pdue" className="input" type="date" min={today} max={addDays(today, 280)} value={due} onChange={(e) => setDue(e.target.value)} /></div>
+      <div className="field"><label htmlFor="pdue">Due date from your doctor or midwife (most accurate)</label><input id="pdue" className="input" type="date" min={today} max={addDays(today, 280)} value={due} onChange={(e) => setDue(e.target.value)} /></div>
       {due && !dueOk && <p className="small" role="alert" style={{ color: 'var(--berry-ink)' }}>Choose a due date between today and 40 weeks from now.</p>}
       <div className="field"><label htmlFor="plmp">Or first day of your last period</label><input id="plmp" className="input" type="date" min={addDays(today, -300)} max={today} value={lmp} onChange={(e) => setLmp(e.target.value)} /></div>
       {lmp && !lmpOk && <p className="small" role="alert" style={{ color: 'var(--berry-ink)' }}>Choose a date in the last 43 weeks.</p>}
@@ -177,14 +183,14 @@ export function PregnancyView() {
   if (!st) {
     return (
       <div className="stack" style={{ '--gap': '16px', maxWidth: 640 } as React.CSSProperties}>
-        <PageTitle eyebrow="Pregnancy" title="Let’s update your dates">The dates saved for this pregnancy can’t be used to work out your week. Enter your clinician’s due date or your last period.</PageTitle>
+        <PageTitle eyebrow="Pregnancy" title="Let’s update your dates">The dates saved for this pregnancy can’t be used to work out your week. Enter the due date from your doctor or midwife, or your last period.</PageTitle>
         {datesForm('Save dates', () => update((d) => ({ ...d, pregnancy: { startedOn: p.startedOn, ...dates() } })))}
       </div>
     );
   }
   const endPregnancy = () => {
-    if (!window.confirm('End pregnancy mode? Your pregnancy details are kept in your history, and cycle tracking resumes.')) return;
     update((d) => ({ ...d, pregnancy: undefined, pastPregnancies: [...d.pastPregnancies, p], settings: { ...d.settings, goal: 'understand' } }));
+    setEnding(false);
   };
 
   return (
@@ -195,7 +201,7 @@ export function PregnancyView() {
         {st && (
           <>
             <div className="progress" style={{ background: 'color-mix(in oklab, var(--on-plum) 25%, transparent)' }}><i style={{ width: `${st.progress * 100}%`, background: 'var(--on-plum)' }} /></div>
-            <p className="small muted">Estimated due date {formatLong(st.dueDate)} · {st.pastDueDate ? 'past the estimated date' : `${st.daysToGo} days to go`} · {st.source === 'clinician' ? 'date from your clinician' : 'estimated from your last period'}</p>
+            <p className="small muted">Estimated due date {formatLong(st.dueDate)} · {st.pastDueDate ? 'past the estimated date' : `${st.daysToGo} days to go`} · {st.source === 'clinician' ? 'date from your doctor or midwife' : 'estimated from your last period'}</p>
           </>
         )}
       </section>
@@ -204,9 +210,8 @@ export function PregnancyView() {
 
       {notes && (
         <section className="card stack" style={{ '--gap': '10px' } as React.CSSProperties}>
-          <div className="row between wrap-row"><h3>{notes.title}</h3>{PREGNANCY_WEEKS_REVIEW.status === 'reviewed'
-            ? <span className="badge developing">Reviewed by {PREGNANCY_WEEKS_REVIEW.reviewer}, {PREGNANCY_WEEKS_REVIEW.credentials}</span>
-            : <span className="badge limited">Clinical review in progress</span>}</div>
+          <span className="eyebrow">Weeks {notes.from}–{notes.to}</span>
+          <div className="row between wrap-row"><h3>{notes.title}</h3></div>
           <p className="small"><strong>Baby:</strong> {notes.baby}</p>
           <p className="small"><strong>You:</strong> {notes.you}</p>
           <p className="tiny faint">General information for weeks {notes.from}–{notes.to}. Every pregnancy is different.</p>
@@ -219,7 +224,7 @@ export function PregnancyView() {
         {[...data.appointments].sort((a, b) => (a.date < b.date ? -1 : 1)).map((a) => (
           <div key={a.id} className="list-btn" style={{ cursor: 'default' }}>
             <span><strong>{a.title}</strong><span className="small muted"> · {formatLong(a.date)}</span></span>
-            <button className="btn ghost" aria-label={`Remove ${a.title}`} onClick={() => update((d) => ({ ...d, appointments: d.appointments.filter((x) => x.id !== a.id) }))}><Icon name="trash" size={18} /></button>
+            <button className="btn ghost" style={{ minWidth: 44 }} aria-label={`Remove ${a.title}`} onClick={() => update((d) => ({ ...d, appointments: d.appointments.filter((x) => x.id !== a.id) }))}><Icon name="trash" size={18} /></button>
           </div>
         ))}
         <div className="row wrap-row">
@@ -229,26 +234,53 @@ export function PregnancyView() {
         </div>
       </section>
 
-      <section className="card stack" style={{ '--gap': '10px' } as React.CSSProperties}>
-        <h3>Symptom journal</h3>
-        <p className="small muted">Log symptoms, mood, sleep and notes any day. They stay private on this device.</p>
-        <Link to="/app/log" className="btn secondary">Open today’s journal</Link>
-      </section>
+      {journal ?? (
+        <section className="card stack" style={{ '--gap': '10px' } as React.CSSProperties}>
+          <h3>Symptom journal</h3>
+          <p className="small muted">Log symptoms, mood, sleep and notes any day. They stay private on this device.</p>
+          <Link to="/app/log" className="btn secondary">Open today’s journal</Link>
+        </section>
+      )}
 
       <div className="row wrap-row">
         <Link to="/app/library/due-date-explained" className="btn secondary">How due dates work</Link>
-        <button className="btn ghost" onClick={endPregnancy}>End pregnancy mode</button>
+        {!ending && <button className="btn ghost" onClick={() => setEnding(true)}>End pregnancy mode</button>}
       </div>
+      {ending && <EndPregnancySheet onConfirm={endPregnancy} onCancel={() => setEnding(false)} />}
       <MedicalNote>Ondessa is not a medical device and does not replace prenatal care.</MedicalNote>
     </div>
+  );
+}
+
+/**
+ * Ending pregnancy mode, for any reason. Neutral wording, no outcome asked, nothing deleted.
+ * An in-app panel rather than a system dialog so it can say this with care.
+ */
+export function EndPregnancySheet({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <section className="card stack" role="alertdialog" aria-labelledby="end-preg-title" aria-describedby="end-preg-body" style={{ '--gap': '12px' } as React.CSSProperties}>
+      <h3 id="end-preg-title">End pregnancy mode?</h3>
+      <div id="end-preg-body" className="stack small muted" style={{ '--gap': '8px' } as React.CSSProperties}>
+        <p>Whatever the reason, your pregnancy details stay in your history on this device. Nothing is deleted.</p>
+        <p>Cycle tracking starts again. Predictions pick up once you log your next period, and they may be less certain for a while.</p>
+        <p>If this follows a loss, please be gentle with yourself. Your midwife or doctor can support you, including with your physical recovery.</p>
+      </div>
+      <div className="row wrap-row">
+        <button className="btn" onClick={onConfirm}>Yes, end pregnancy mode</button>
+        <button className="btn secondary" autoFocus onClick={onCancel}>Keep pregnancy mode</button>
+      </div>
+    </section>
   );
 }
 
 /* ------------------------------------------------------------------ Insights */
 
 export function Insights() {
-  const { data, forecast: f, insights } = useStore();
+  const { data, forecast: f, insights, today } = useStore();
   if (!data || !f) return null;
+  const recap = lastCycleRecap(data, today);
+  const usedLens = f.usedCycleLengths;
+  const recentPeriods = f.cycles.filter((c) => c.usable).slice(-6).map((c) => c.periodLength);
   const all = f.cycles.slice(-12);
   const usableCount = f.usableCycleCount;
   const loggedDays = Object.keys(data.logs).length;
@@ -261,7 +293,23 @@ export function Insights() {
 
   return (
     <div className="stack" style={{ '--gap': '18px' } as React.CSSProperties}>
-      <PageTitle eyebrow="My Cycle, My Patterns" title="What your logs show">Every observation below comes only from what you logged, says what it’s based on, and never claims a cause.</PageTitle>
+      <PageTitle eyebrow="Insights" title={usableCount < 3 ? `Your first patterns arrive in ${3 - usableCount} cycle${3 - usableCount === 1 ? '' : 's'}` : 'What your logs show'}>Every observation below comes only from what you logged, says what it’s based on, and never claims a cause.</PageTitle>
+
+      {usedLens.length >= 1 && (
+        <div className="stat-grid" role="group" aria-label="Your numbers">
+          <div><div className="kicker-num">{f.predictedCycleLength}<small>d</small></div><div className="small muted">Typical cycle</div></div>
+          <div><div className="kicker-num">{recentPeriods.length ? Math.round(median(recentPeriods)) : f.predictedPeriodLength}<small>d</small></div><div className="small muted">Typical period</div></div>
+          <div><div className="kicker-num">{usedLens.length >= 2 ? Math.max(...usedLens) - Math.min(...usedLens) : '—'}{usedLens.length >= 2 && <small>d</small>}</div><div className="small muted">{usedLens.length < 2 ? 'Spread' : Math.min(...usedLens) === Math.max(...usedLens) ? 'Spread, all equal' : `Spread, ${Math.min(...usedLens)}–${Math.max(...usedLens)} days`}</div></div>
+        </div>
+      )}
+
+      {recap && (
+        <Link to="/app/recap" className="card stack phase-menstrual" >
+          <span className="row between"><span className="eyebrow">Last cycle recap</span><Icon name="chevron" size={18} /></span>
+          <strong>{accuracyHeadline(recap)}</strong>
+          <span className="small muted">{recap.length} days · {recap.daysLogged} days logged{recap.predicted ? ` · predicted ${formatShort(recap.predicted)}, started ${formatShort(recap.nextStart)}` : ''}</span>
+        </Link>
+      )}
 
       <section className="card stack" style={{ '--gap': '12px' } as React.CSSProperties}>
         <div className="row between wrap-row"><h3>Prediction confidence</h3><ConfidenceBadge level={f.confidence} /></div>
@@ -278,20 +326,30 @@ export function Insights() {
       {usableCount < 3 && (
         <section className="card tint-phase phase-luteal stack" style={{ '--gap': '12px' } as React.CSSProperties}>
           <span className="eyebrow">Patterns unlock after 3 complete cycles</span>
-          <div className="row" style={{ '--gap': '6px' } as React.CSSProperties} aria-label={`${usableCount} of 3 cycles complete`}>
+          <div className="row" role="img" style={{ '--gap': '6px' } as React.CSSProperties} aria-label={`${usableCount} of 3 cycles complete`}>
             {[0, 1, 2].map((i) => <span key={i} style={{ flex: 1, height: 8, borderRadius: 8, background: i < usableCount ? 'var(--phase)' : 'var(--paper)' }} />)}
           </div>
           <p className="small"><strong>{usableCount} of 3 cycles</strong> · {loggedDays} day{loggedDays === 1 ? '' : 's'} logged so far.</p>
           {topThisCycle && <p className="small muted">Most logged this cycle: {topThisCycle}.</p>}
+          <div className="row wrap-row" style={{ '--gap': '8px' } as React.CSSProperties}>
+            <Link to="/app/history" className="btn">Skip the wait: add past periods</Link>
+            <Link to="/app/log" className="btn secondary">Log today</Link>
+          </div>
         </section>
       )}
 
       {insights.filter((i) => i.id !== 'limited-history' || usableCount >= 3).map((i) => (
-        <section key={i.id} className={`card stack ${i.kind === 'care' || i.kind === 'range' ? 'tint-berry' : ''}`} style={{ '--gap': '8px' } as React.CSSProperties}>
-          <h3>{i.title}</h3>
+        <section key={i.id} className={`card stack ${i.kind === 'care' || i.kind === 'range' ? 'tint-berry' : ''} ${i.kind === 'symptom' ? 'phase-menstrual' : 'phase-fertile'}`} style={{ '--gap': '8px' } as React.CSSProperties}>
+          <h3 className="display" style={{ fontFamily: 'var(--display)', fontWeight: 400, fontSize: '1.5rem', lineHeight: 1.1 }}>{i.title}</h3>
+          {i.evidence && <EvidenceStrip hits={i.evidence.hits} total={i.evidence.total} label={i.evidence.label} />}
           <p>{i.body}</p>
-          <p className="small muted"><strong>Based on:</strong> {i.basis}</p>
-          <p className="small muted"><strong>Keep in mind:</strong> {i.limitation}</p>
+          <details className="small">
+            <summary style={{ cursor: 'pointer', fontWeight: 560, minHeight: 44, display: 'flex', alignItems: 'center' }}>Based on, and what to keep in mind</summary>
+            <div className="stack" style={{ '--gap': '6px', marginTop: 4 } as React.CSSProperties}>
+              <p className="muted"><strong>Based on:</strong> {i.basis}</p>
+              <p className="muted"><strong>Keep in mind:</strong> {i.limitation}</p>
+            </div>
+          </details>
         </section>
       ))}
 
@@ -304,10 +362,11 @@ export function Insights() {
                 <div key={c.start} className="bar">
                   <strong>{c.length}</strong>
                   <span className={`b ${c.usable ? '' : 'excluded'}`} style={{ height: `${(Math.min(c.length, maxLen) / maxLen) * 110}px` }} />
-                  <span>{formatShort(c.start).split(' ')[0]}</span>
+                  <span>{formatShort(c.start).split(' ')[0]}<br />{Number(c.start.slice(8))}</span>
                 </div>
               ))}
             </div>
+            <p className="tiny faint">Each bar is a cycle, labelled by its start date. The latest is in colour.</p>
             {all.some((c) => !c.usable) && <p className="tiny faint">Grey bars were left out of predictions (shorter than {RULES.plausibleCycle.min} or longer than {RULES.plausibleCycle.max} days).</p>}
             <div>
               {[...all].reverse().map((c) => (
@@ -325,35 +384,11 @@ export function Insights() {
   );
 }
 
-/* ------------------------------------------------------------------ More / Settings */
-
-export function More() {
-  const items = [
-    { to: '/app/pregnancy', icon: 'heart', t: 'Pregnancy', d: 'Pregnancy mode and calendar' },
-    { to: '/app/fertility', icon: 'leaf', t: 'Fertility & ovulation', d: 'Estimated window and signs' },
-    { to: '/app/library', icon: 'book', t: 'Library', d: 'Guides on cycles, fertility and pregnancy, with sources' },
-    { to: '/app/settings', icon: 'bell', t: 'Reminders & settings', d: 'Cycle, reminders, life stage' },
-    { to: '/app/privacy', icon: 'shield', t: 'Privacy center', d: 'Passcode, backup, export, delete' },
-    { to: '/app/membership', icon: 'spark', t: 'Membership', d: 'Plan, renewal, membership key' },
-    { to: '/help', icon: 'info', t: 'Help & legal', d: 'FAQ, terms, disclaimers' },
-  ];
-  return (
-    <div className="stack" style={{ maxWidth: 640 } as React.CSSProperties}>
-      <PageTitle title="More" />
-      <div className="card" style={{ paddingTop: 4, paddingBottom: 4 }}>
-        {items.map((i) => (
-          <Link key={i.to} to={i.to} className="list-btn">
-            <span className="row"><span style={{ color: 'var(--berry)' }}><Icon name={i.icon} /></span><span><span style={{ fontWeight: 600, display: 'block' }}>{i.t}</span><span className="small muted">{i.d}</span></span></span>
-            <Icon name="chevron" />
-          </Link>
-        ))}
-      </div>
-    </div>
-  );
-}
+/* ------------------------------------------------------------------ Settings */
 
 export function Settings() {
   const { data, update, forecast: f, today } = useStore();
+  const [pendingGoal, setPendingGoal] = useState<Goal>();
   const [notifState, setNotifState] = useState<'granted' | 'denied' | 'prompt'>();
   useEffect(() => {
     void notificationPermission().then(setNotifState);
@@ -369,6 +404,11 @@ export function Settings() {
     if (turnedOn && notifState === 'prompt') void askNotifications();
   };
   const upcoming = upcomingReminders(data, f, today, 30);
+  const applyGoal = (goal: Goal) => update((d) => ({
+    ...d,
+    ...(d.pregnancy ? { pregnancy: undefined, pastPregnancies: [...d.pastPregnancies, d.pregnancy] } : {}),
+    settings: { ...d.settings, goal, ...(goal === 'conceive' ? { showFertility: true, fertilitySigns: true } : {}) },
+  }));
 
   return (
     <div className="stack" style={{ '--gap': '18px', maxWidth: 680 } as React.CSSProperties}>
@@ -376,21 +416,18 @@ export function Settings() {
 
       <section className="card stack" style={{ '--gap': '12px' } as React.CSSProperties}>
         <h3>Life stage</h3>
-        <select className="input" value={s.goal} aria-label="Life stage" onChange={(e) => {
+        <select className="input" value={pendingGoal ?? s.goal} aria-label="Life stage" onChange={(e) => {
           const goal = e.target.value as Goal;
           if (goal === 'pregnant') return navigate('/app/pregnancy');
-          if (data.pregnancy && !window.confirm('End pregnancy mode? Your pregnancy details are kept in your history, and cycle tracking resumes.')) return;
-          update((d) => ({
-            ...d,
-            ...(d.pregnancy ? { pregnancy: undefined, pastPregnancies: [...d.pastPregnancies, d.pregnancy] } : {}),
-            settings: { ...d.settings, goal, ...(goal === 'conceive' ? { showFertility: true, fertilitySigns: true } : {}) },
-          }));
+          if (data.pregnancy) return setPendingGoal(goal);
+          applyGoal(goal);
         }}>
           <option value="understand">Understanding my cycle</option>
           <option value="conceive">Planning a pregnancy</option>
           <option value="pregnant">Pregnant</option>
           <option value="perimenopause">Changing cycles / perimenopause</option>
         </select>
+        {pendingGoal && <EndPregnancySheet onConfirm={() => { applyGoal(pendingGoal); setPendingGoal(undefined); }} onCancel={() => setPendingGoal(undefined)} />}
         <Stepper label="Usual cycle length (used until you have history)" unit="days" value={s.cycle.typicalCycleLength} min={15} max={90} onChange={(v) => set({ cycle: { ...s.cycle, typicalCycleLength: v } })} />
         <Stepper label="Usual period length" unit="days" value={s.cycle.typicalPeriodLength} min={1} max={15} onChange={(v) => set({ cycle: { ...s.cycle, typicalPeriodLength: v } })} />
       </section>
@@ -408,6 +445,7 @@ export function Settings() {
           }));
         }} />
         <div className="toggle-row"><span style={{ fontWeight: 600 }}>Temperature unit</span><Segmented label="Temperature unit" value={s.temperatureUnit} onChange={(v) => set({ temperatureUnit: v })} options={[{ value: 'C', label: '°C' }, { value: 'F', label: '°F' }]} /></div>
+        <div className="toggle-row" style={{ flexWrap: 'wrap', rowGap: 10 }}><span style={{ fontWeight: 600 }}>Appearance</span><AppearancePicker /></div>
         <div className="toggle-row"><span style={{ fontWeight: 600 }}>Week starts on</span><Segmented label="Week starts on" value={String(s.weekStartsOn) as '0' | '1'} onChange={(v) => set({ weekStartsOn: v === '0' ? 0 : 1 })} options={[{ value: '1', label: 'Mon' }, { value: '0', label: 'Sun' }]} /></div>
       </section>
 
@@ -486,7 +524,7 @@ export function PrivacyCenter() {
 
       <section className="card stack" style={{ '--gap': '10px' } as React.CSSProperties}>
         <h3>What’s stored, and where</h3>
-        <p className="small muted">On this device only: {plural(counts.days, 'logged day')}, {plural(counts.notes, 'note')}, {plural(counts.appts, 'appointment')}, your settings{data.pregnancy ? ' and pregnancy details' : ''}. {locked ? 'Encrypted with your passcode.' : isNative ? 'Not encrypted. Anyone who can unlock this device and open Ondessa can view it.' : 'Not encrypted. Anyone who can open this browser can view it.'}</p>
+        {tour ? <p className="small muted">This is sample data for the tour. None of it is saved, and it disappears when you leave the tour. Once you set up Ondessa, everything you log is stored only on your device.</p> : <p className="small muted">On this device only: {plural(counts.days, 'logged day')}, {plural(counts.notes, 'note')}, {plural(counts.appts, 'appointment')}, your settings{data.pregnancy ? ' and pregnancy details' : ''}. {locked ? 'Encrypted with your passcode.' : isNative ? 'Not encrypted. Anyone who can unlock this device and open Ondessa can view it.' : 'Not encrypted. Anyone who can open this browser can view it.'}</p>}
         <p className="small muted">Sent to us or anyone else: nothing about your health. No analytics, ads or AI services run in Ondessa.</p>
         <Link to="/privacy" className="btn ghost" >Full privacy summary <Icon name="chevron" size={16} /></Link>
       </section>
@@ -526,7 +564,7 @@ export function PrivacyCenter() {
         <h3>Delete everything</h3>
         <p className="small muted">Permanently removes all Ondessa data and your membership key from this device, then checks that nothing remains. This cannot be undone. It does not cancel a subscription; manage that from Membership.</p>
         <input className="input" placeholder='Type DELETE to confirm' aria-label="Type DELETE to confirm" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} />
-        <button className="btn danger" disabled={confirmText !== 'DELETE' || tour} onClick={async () => navigate((await eraseAll()) ? '/deleted' : '/deleted-unverified', true)}><Icon name="trash" size={18} /> Permanently delete</button>
+        <button className="btn danger" disabled={confirmText.trim().toUpperCase() !== 'DELETE' || tour} onClick={async () => navigate((await eraseAll()) ? '/deleted' : '/deleted-unverified', true)}><Icon name="trash" size={18} /> Permanently delete</button>
       </section>
       <Toast msg={toast} />
     </div>
@@ -536,8 +574,16 @@ export function PrivacyCenter() {
 /* ------------------------------------------------------------------ Membership (in-app) */
 
 export function Membership() {
-  const { entitlement, refreshEntitlement } = useStore();
+  const { entitlement, refreshEntitlement, tour } = useStore();
   const [msg, setMsg] = useState<string>();
+  if (tour) {
+    return (
+      <div className="stack" style={{ '--gap': '14px', maxWidth: 640 } as React.CSSProperties}>
+        <PageTitle eyebrow="Membership" title="You’re on the tour">No membership is needed to look around. When you set up Ondessa with your own data, you’ll see your plan, renewal date and how to manage it here.</PageTitle>
+        <Link to="/plans" className="btn secondary">See plans</Link>
+      </div>
+    );
+  }
   const active = entitlement.status === 'active';
   const planName = !active ? 'None' : entitlement.plan === 'preview' ? 'Preview pass' : entitlement.plan === 'annual' ? 'Yearly' : 'Monthly';
   const renewal = !active ? '—'
@@ -609,6 +655,11 @@ function QuickUnlock({ notify }: { notify: (m: string) => void }) {
       )}
     </div>
   );
+}
+
+function AppearancePicker() {
+  const [theme, set] = useState<ThemeChoice>(getTheme);
+  return <Segmented full label="Appearance" value={theme} onChange={(v) => { setTheme(v); set(v); }} options={[{ value: 'system', label: 'Auto' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} />;
 }
 
 function plural(n: number, word: string): string {

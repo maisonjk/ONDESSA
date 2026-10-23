@@ -1,28 +1,39 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, navigate } from '../app/router';
 import { useStore } from '../app/store';
 import { ARTICLES } from '../content/library';
 import {
-  addDays, classifyDay, diffDays, phaseOn, upcomingFertileWindow, weekday, PHASE_COPY, formatLong, formatRange, formatShort, monthGrid, monthName, pregnancyStatus,
+  addDays, classifyDay, commonAroundNow, diffDays, headsUp, phaseOn, upcomingFertileWindow, weekday, PHASE_COPY, formatLong, formatRange, formatShort, monthGrid, monthName, pregnancyStatus,
   upcomingReminders, MOODS, SYMPTOMS,
   type DayLog, type Flow, type ISODate, type Level, type Mucus, type Symptom,
 } from '../engine';
+import { PregnancyView } from './app-more';
 import {
-  ConfidenceBadge, DotRing, Icon, Mark, MedicalNote, PageTitle, PhasePill, Toast,
+  ConfidenceBadge, DotRing, EvidenceStrip, Icon, Mark, MedicalNote, PhasePill, Toast,
 } from '../ui/components';
 
 const TABS = [
   { to: '/app', label: 'Today', icon: 'home' },
   { to: '/app/calendar', label: 'Calendar', icon: 'calendar' },
   { to: '/app/log', label: 'Log', icon: 'plus' },
-  { to: '/app/insights', label: 'Patterns', icon: 'spark' },
-  { to: '/app/more', label: 'More', icon: 'menu' },
+  { to: '/app/insights', label: 'Insights', icon: 'spark' },
+  { to: '/app/you', label: 'You', icon: 'user' },
 ];
 
-export function AppShell({ path, children }: { path: string; children: React.ReactNode }) {
+/** Screens reached from the You tab keep it highlighted. */
+const YOU_PATHS = ['/app/you', '/app/more', '/app/settings', '/app/privacy', '/app/membership', '/app/share', '/app/recap', '/app/history', '/app/pregnancy', '/app/fertility', '/app/library'];
+
+/** Section of the log screen to open at, set by the Today tiles. Memory only. */
+let pendingLogSection: string | undefined;
+export function openLog(section?: string) {
+  pendingLogSection = section;
+  navigate('/app/log');
+}
+
+export function AppShell({ path, children, limited = false }: { path: string; children: React.ReactNode; limited?: boolean }) {
   const { tour, exitTour, today, storageError, notice, selectDate } = useStore();
   return (
-    <div className="app">
+    <div className={`app${limited ? ' limited' : ''}`}>
       {tour && (
         <div className="tour-banner">
           <div className="wrap">
@@ -41,12 +52,19 @@ export function AppShell({ path, children }: { path: string; children: React.Rea
         </div>
       </header>
       {storageError && <div className="wrap" style={{ paddingTop: 12 }}><div className="callout" role="alert">{storageError}</div></div>}
+      {limited && (
+        <div className="wrap" style={{ paddingTop: 12 }}>
+          <div className="callout" role="note">
+            Your membership isn’t active, but your data is still yours: back it up, export it or delete it here. <Link to="/plans">See plans</Link>
+          </div>
+        </div>
+      )}
       <main className="wrap main">{children}</main>
       <Toast msg={notice} />
-      <div className="tabbar">
+      {!limited && <div className="tabbar">
         <nav aria-label="Main">
           {TABS.map((t) => {
-            const current = t.to === '/app' ? path === '/app' : path.startsWith(t.to);
+            const current = t.to === '/app' ? path === '/app' : t.to === '/app/you' ? YOU_PATHS.some((p) => path.startsWith(p)) : path.startsWith(t.to);
             return (
               <Link key={t.to} to={t.to} className={t.icon === 'plus' ? 'log-tab' : undefined} aria-current={current ? 'page' : undefined} onClick={t.icon === 'plus' ? () => selectDate(today) : undefined}>
                 <span className={t.icon === 'plus' ? 'plus' : undefined}><Icon name={t.icon} size={t.icon === 'plus' ? 24 : 22} /></span>
@@ -55,7 +73,7 @@ export function AppShell({ path, children }: { path: string; children: React.Rea
             );
           })}
         </nav>
-      </div>
+      </div>}
     </div>
   );
 }
@@ -63,7 +81,7 @@ export function AppShell({ path, children }: { path: string; children: React.Rea
 /* ------------------------------------------------------------------ Home */
 
 export function Home() {
-  const { data, forecast: f, insights, today, selectDate, tour } = useStore();
+  const { data, forecast: f, insights, today, tour } = useStore();
   if (!data || !f) return null;
   if (data.pregnancy) return <PregnancyHome />;
 
@@ -102,7 +120,8 @@ export function Home() {
     pill = phase ? PHASE_COPY[phase].label : 'Cycle';
   }
 
-  const topInsight = insights.find((i) => i.kind !== 'data') ?? insights[0];
+  const heads = headsUp(f, insights, today);
+  const topInsight = insights.find((i) => i.kind !== 'data' && (!heads || i.symptom !== heads.symptom)) ?? (heads || !f.lastPeriod ? undefined : insights[0]);
   const reminders = upcomingReminders(data, f, today, 21).filter((r) => r.id !== 'daily-log').slice(0, 3);
   const todayLog = data.logs[today];
   const fertileWin = upcomingFertileWindow(f);
@@ -120,6 +139,7 @@ export function Home() {
             <h1 className="big-caption">{big ? <span className="sr-only">{big} </span> : null}{caption}</h1>
           </div>
           <p className="muted" style={{ maxWidth: '38ch' }}>{detail}</p>
+          {late && <Link to="/app/library/when-to-test" className="small" >When a pregnancy test is most reliable →</Link>}
           <div className="row wrap-row" style={{ '--gap': '8px' } as React.CSSProperties}>
             <ConfidenceBadge level={f.confidence} />
             {f.irregular && <span className="badge">Wider window</span>}
@@ -133,7 +153,7 @@ export function Home() {
         </div>
         <div className="stack" style={{ '--gap': '10px', alignItems: 'center' } as React.CSSProperties}>
           <DotRing f={f} showFertility={showFertility} />
-          <div className="legend" style={{ justifyContent: 'center' }}>
+          <div className="legend legend-grid">
             <span><i style={{ background: 'var(--berry)' }} />Period</span>
             <span><i style={{ background: 'var(--apricot)' }} />Follicular</span>
             {showFertility && <span><i style={{ background: 'var(--sage)' }} />Fertile (est.)</span>}
@@ -143,6 +163,14 @@ export function Home() {
       </section>
 
       <WeekStrip />
+
+      {heads && (
+        <Link to="/app/insights" className="card plum stack phase-menstrual heads-up" >
+          <span className="row between"><span className="eyebrow">Heads up · from your logs</span><Icon name="chevron" size={18} /></span>
+          <span className="display" style={{ fontSize: '1.6rem', lineHeight: 1.1 }}>{heads.title}</span>
+          <EvidenceStrip hits={heads.hits} total={heads.total} label={`${heads.hits} of your last ${heads.total} cycles`} />
+        </Link>
+      )}
 
       <div className="bento">
         {backupDue && (
@@ -158,18 +186,18 @@ export function Home() {
             <span className="eyebrow">Today’s log</span>
             <span className="tiny faint mono">{formatShort(today).toUpperCase()}</span>
           </div>
-          <QuickLog showFlow={showFlowFirst(f, today)} />
-          <p className="small faint">{todayLog ? summarizeLog(todayLog, data.settings.temperatureUnit) : 'Nothing logged yet. Every field is optional.'}</p>
-          <button className="btn secondary" onClick={() => { selectDate(today); navigate('/app/log'); }}>Add symptoms, mood & more</button>
+          <LogTiles />
+          <QuickLog showFlow={showFlowFirst(f, today)} highlight={heads?.symptom} />
+          <p className="small faint">{todayLog ? summarizeLog(todayLog, data.settings.temperatureUnit) : 'Nothing logged yet. One tap saves on this device.'}</p>
         </section>
 
         {topInsight && (
           <Link to="/app/insights" className="card tint-sage stack span-3" >
-            <span className="eyebrow" style={{ color: 'var(--sage-ink)' }}>My Cycle, My Patterns</span>
+            <span className="eyebrow" style={{ color: 'var(--sage-ink)' }}>Insights · from your logs</span>
             <h3 style={{ fontSize: '1.35rem' }}>{topInsight.title}</h3>
             <p className="small">{topInsight.body}</p>
             <p className="tiny muted">{topInsight.limitation}</p>
-            <span className="small" style={{ fontWeight: 560, marginTop: 'auto' }}>All patterns →</span>
+            <span className="small" style={{ fontWeight: 560, marginTop: 'auto' }}>All insights →</span>
           </Link>
         )}
 
@@ -186,7 +214,7 @@ export function Home() {
             <span className="eyebrow">Coming up</span>
             {reminders.map((r) => (
               <div key={r.id} className="row between small" style={{ padding: '6px 0' }}>
-                <span>{r.title}</span><span className="faint mono tiny" style={{ whiteSpace: 'nowrap' }}>{r.date === today ? 'TODAY' : `REMIND ${formatShort(r.date).toUpperCase()}`}</span>
+                <span>{r.title}</span><span className="faint mono tiny" style={{ whiteSpace: 'nowrap' }}>{r.date === today ? 'REMINDER TODAY' : `REMINDER ${formatShort(r.date).toUpperCase()}`}</span>
               </div>
             ))}
           </section>
@@ -202,6 +230,30 @@ export function Home() {
       </div>
       <MedicalNote />
     </div>
+  );
+}
+
+/** Four big doors into the log screen, each showing whether that part of today is logged. */
+function LogTiles() {
+  const { data, today, selectDate } = useStore();
+  if (!data) return null;
+  const l = data.logs[today];
+  const tiles = [
+    ...(data.pregnancy ? [] : [{ id: 'log-flow', label: 'Period', icon: 'drop', phase: 'menstrual', done: !!l?.flow }]),
+    { id: 'log-symptoms', label: 'Symptoms', icon: 'pulse', phase: 'follicular', done: !!(l?.symptoms?.length || l?.pain !== undefined) },
+    { id: 'log-mood', label: 'Mood', icon: 'face', phase: 'luteal', done: !!(l?.mood || l?.energy) },
+    { id: 'log-sleep', label: 'Sleep', icon: 'moon', phase: 'fertile', done: !!l?.sleep },
+  ];
+  return (
+    <nav className="log-tiles" aria-label="Log today" style={{ gridTemplateColumns: `repeat(${tiles.length}, minmax(0, 1fr))` }}>
+      {tiles.map((t) => (
+        <a key={t.id} href="#/app/log" className={`phase-${t.phase} ${t.done ? 'done' : ''}`} aria-label={`${t.label}${t.done ? ', logged today' : ''}`}
+          onClick={(e) => { e.preventDefault(); selectDate(today); openLog(t.id); }}>
+          <span className="ico"><Icon name={t.done ? 'check' : t.icon} size={20} /></span>
+          <span aria-hidden="true">{t.label}</span>
+        </a>
+      ))}
+    </nav>
   );
 }
 
@@ -227,7 +279,7 @@ function WeekStrip() {
             >
               <span className="wd">{letters[weekday(d)]}</span>{' '}
               <span className="dn">{Number(d.slice(8))}</span>
-              <span className="sr-only">, {formatLong(d)}{ph ? `, ${PHASE_COPY[ph].label}${future ? ' (estimate)' : ''}` : ''}</span>
+              <span className="sr-only"> {formatLong(d)}{ph ? `. ${PHASE_COPY[ph].label}${future && !PHASE_COPY[ph].label.includes('estimate') ? ' (estimate)' : ''}` : ''}</span>
               <span className={`pd ${ph ? (future ? 'predicted' : '') : 'none'}`} />
             </button>
           );
@@ -260,20 +312,32 @@ function showFlowFirst(f: NonNullable<ReturnType<typeof useStore>['forecast']>, 
 }
 
 /** One-tap logging for today: flow around periods, otherwise the user's most-logged symptoms and mood. */
-function QuickLog({ showFlow }: { showFlow: boolean }) {
+function QuickLog({ showFlow, highlight }: { showFlow: boolean; highlight?: Symptom }) {
   const { data, setLog, today, notify } = useStore();
   if (!data) return null;
   const log = data.logs[today] ?? { date: today };
-  if (showFlow) return <QuickFlow date={today} />;
-  const counts = new Map<Symptom, number>();
-  for (const l of Object.values(data.logs)) for (const x of l.symptoms ?? []) counts.set(x, (counts.get(x) ?? 0) + 1);
-  const top = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([x]) => x);
-  const symptoms = [...new Set([...top, 'cramps', 'headache', 'bloating', 'fatigue'] as Symptom[])].slice(0, 4);
   const toggle = (x: Symptom) => {
     const on = !!log.symptoms?.includes(x);
     setLog({ ...log, symptoms: on ? log.symptoms!.filter((y) => y !== x) : [...(log.symptoms ?? []), x] });
     notify(on ? 'Removed' : `Logged ${x}`);
   };
+  // Around a period, flow comes first; a heads-up symptom stays one tap away too.
+  if (showFlow) {
+    return (
+      <div className="stack" style={{ '--gap': '10px' } as React.CSSProperties}>
+        <QuickFlow date={today} />
+        {highlight && (
+          <div className="chips" role="group" aria-label="Quick symptoms">
+            <button type="button" className="chip" aria-pressed={!!log.symptoms?.includes(highlight)} onClick={() => toggle(highlight)}>{highlight}</button>
+          </div>
+        )}
+      </div>
+    );
+  }
+  const counts = new Map<Symptom, number>();
+  for (const l of Object.values(data.logs)) for (const x of l.symptoms ?? []) counts.set(x, (counts.get(x) ?? 0) + 1);
+  const top = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([x]) => x);
+  const symptoms = [...new Set([...(highlight ? [highlight] : []), ...top, 'cramps', 'headache', 'bloating', 'fatigue'] as Symptom[])].slice(0, 4);
   return (
     <div className="stack" style={{ '--gap': '10px' } as React.CSSProperties}>
       <div className="chips" role="group" aria-label="Quick symptoms">
@@ -291,6 +355,28 @@ function QuickLog({ showFlow }: { showFlow: boolean }) {
 const FLOWS: { v: Flow; label: string }[] = [
   { v: 'spotting', label: 'Spotting' }, { v: 'light', label: 'Light' }, { v: 'medium', label: 'Medium' }, { v: 'heavy', label: 'Heavy' },
 ];
+
+/**
+ * Pregnancy: bleeding is a warning sign, not a period. It's stored as spotting so it never
+ * starts a cycle, and logging it always points to medical help.
+ */
+function PregnancyBleeding({ date }: { date: ISODate }) {
+  const { data, setLog } = useStore();
+  const log = data?.logs[date] ?? { date };
+  const on = !!log.flow;
+  return (
+    <div className="stack" style={{ '--gap': '10px' } as React.CSSProperties}>
+      <div className="chips" role="group" aria-label="Spotting or bleeding">
+        <button type="button" className="chip berry" aria-pressed={on} onClick={() => setLog({ ...log, flow: on ? undefined : 'spotting' })}>Spotting or bleeding</button>
+      </div>
+      {on && (
+        <p className="small" role="note" style={{ color: 'var(--berry-ink)' }}>
+          Bleeding in pregnancy should be checked. Contact your midwife or doctor, or emergency services if it’s heavy or you have pain. <Link to="/app/library/pregnancy-when-to-call">When to call</Link>
+        </p>
+      )}
+    </div>
+  );
+}
 
 function QuickFlow({ date }: { date: ISODate }) {
   const { data, setLog, notify } = useStore();
@@ -323,6 +409,9 @@ export function Calendar() {
     return data.pregnancy && k !== 'period' && k !== 'spotting' ? 'none' : k;
   };
   const kind = kindOf(selectedDate);
+  const pst = data.pregnancy ? pregnancyStatus(data.pregnancy, selectedDate, data.settings.cycle.typicalCycleLength) : undefined;
+  const pregWeek = pst ? `Pregnancy week ${pst.week}${pst.day ? ` + ${pst.day}` : ''}` : undefined;
+  const apptOn = data.appointments.filter((a) => a.date === selectedDate);
   const kindLabel: Record<string, string> = {
     period: 'Period (logged)', spotting: 'Spotting (logged)', 'predicted-period': 'Predicted period',
     'possible-period': 'Period possible (expected window)', fertile: 'Estimated fertile window', ovulation: 'Estimated ovulation day', none: '',
@@ -342,7 +431,7 @@ export function Calendar() {
           {grid.map((d) => {
             const k = kindOf(d);
             const l = data.logs[d];
-            const hasDetails = !!(l && (l.symptoms?.length || l.mood || l.note || l.lh || l.bbt || l.mucus));
+            const hasDetails = !!(l && (l.symptoms?.length || l.mood || l.note || l.lh || l.bbt || l.mucus)) || (!!data.pregnancy && data.appointments.some((a) => a.date === d));
             const cls = ['day', k !== 'none' ? k : '', d.startsWith(monthPrefix) ? '' : 'out', d === today ? 'today' : '', d === selectedDate ? 'selected' : ''].join(' ');
             return (
               <button key={d} type="button" className={cls} onClick={() => selectDate(d)} aria-label={`${formatLong(d)}${kindLabel[k] ? `, ${kindLabel[k]}` : ''}${hasDetails ? ', has notes' : ''}`} aria-pressed={d === selectedDate}>
@@ -353,12 +442,20 @@ export function Calendar() {
           })}
         </div>
         <div className="legend" style={{ marginTop: 16, padding: '0 8px 8px' }}>
-          <span><i style={{ background: 'var(--berry)' }} />Logged period</span>
-          <span><i style={{ boxShadow: 'inset 0 0 0 1.5px var(--berry)' }} />Most likely</span>
-          <span><i style={{ boxShadow: 'inset 0 0 0 1.5px var(--berry)', opacity: 0.45 }} />Possible</span>
+          {data.pregnancy ? (
+            <>
+              <span><i style={{ boxShadow: 'inset 0 0 0 2px var(--berry)' }} />Spotting or bleeding logged</span>
+            </>
+          ) : (
+            <>
+              <span><i style={{ background: 'var(--berry)' }} />Logged period</span>
+              <span><i style={{ boxShadow: 'inset 0 0 0 1.5px var(--berry)' }} />Most likely</span>
+              <span><i style={{ boxShadow: 'inset 0 0 0 1.5px var(--berry)', opacity: 0.45 }} />Possible</span>
+            </>
+          )}
           {data.settings.showFertility && !data.pregnancy && <span><i style={{ background: 'var(--sage-soft)', boxShadow: 'inset 0 0 0 1px var(--sage)' }} />Fertile estimate</span>}
           {data.settings.showFertility && !data.pregnancy && <span><i style={{ background: 'var(--sage-ink)' }} />Est. ovulation</span>}
-          <span><i style={{ background: 'var(--gold)' }} />Has notes</span>
+          <span><i style={{ background: 'var(--gold)' }} />{data.pregnancy ? 'Notes or appointment' : 'Has notes'}</span>
         </div>
       </section>
 
@@ -366,12 +463,13 @@ export function Calendar() {
         <div className="row between">
           <div>
             <h3>{formatLong(selectedDate)}</h3>
-            {kindLabel[kind] && <span className="small muted">{kindLabel[kind]}</span>}
+            {pregWeek ? <span className="small muted">{pregWeek}{apptOn.length ? ` · ${apptOn.map((a) => a.title).join(', ')}` : ''}</span>
+              : kindLabel[kind] && <span className="small muted">{kindLabel[kind]}</span>}
           </div>
           {selectedDate <= today && <button className="btn" onClick={() => navigate('/app/log')}>{sel ? 'Edit' : 'Log'}</button>}
         </div>
         {sel ? <p className="small muted">{summarizeLog(sel, data.settings.temperatureUnit)}</p> : <p className="small faint">{selectedDate > today ? 'Future dates show estimates only.' : 'Nothing logged.'}</p>}
-        {selectedDate <= today && <QuickFlow date={selectedDate} />}
+        {selectedDate <= today && (data.pregnancy ? <PregnancyBleeding date={selectedDate} /> : <QuickFlow date={selectedDate} />)}
       </section>
       {f.nextPeriod && !data.pregnancy && (
         <p className="small faint">Predictions further ahead are less certain. Each later cycle’s window widens by a day.</p>
@@ -387,9 +485,24 @@ const MUCUS: { v: Mucus; label: string }[] = [
 ];
 
 export function LogDay() {
-  const { data, setLog, selectedDate, selectDate, today, notify: showToast } = useStore();
+  const { data, forecast: f, setLog, selectedDate, selectDate, today, notify: showToast } = useStore();
+  useEffect(() => {
+    const id = pendingLogSection;
+    pendingLogSection = undefined;
+    if (!id) return;
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    el.querySelector<HTMLElement>('button')?.focus({ preventScroll: true });
+  }, []);
   if (!data) return null;
   const date = selectedDate > today ? today : selectedDate;
+  const common = f ? commonAroundNow(f, data.logs, date) : [];
+  const usage = new Map<string, number>();
+  for (const l of Object.values(data.logs)) for (const x of l.symptoms ?? []) usage.set(x, (usage.get(x) ?? 0) + 1);
+  const rank = (x: string) => (common.includes(x as Symptom) ? 1000 - common.indexOf(x as Symptom) : 0) + (usage.get(x) ?? 0);
+  const orderedSymptoms = [...SYMPTOMS].sort((a, b) => rank(b) - rank(a) || SYMPTOMS.indexOf(a) - SYMPTOMS.indexOf(b));
+  const entryCount = countEntries(data.logs[date]);
   const log: DayLog = data.logs[date] ?? { date };
   const set = (patch: Partial<DayLog>) => setLog({ ...log, ...patch, date });
   const s = data.settings;
@@ -407,8 +520,13 @@ export function LogDay() {
         <button className="btn ghost" aria-label="Next day" disabled={date >= today} onClick={() => selectDate(addDays(date, 1))}><Icon name="chevron" /></button>
       </div>
 
+      {data.pregnancy && (
+        <LogSection id="log-flow" title="Spotting or bleeding">
+          <PregnancyBleeding date={date} />
+        </LogSection>
+      )}
       {!data.pregnancy && (
-        <LogSection title="Bleeding">
+        <LogSection id="log-flow" title="Bleeding">
           <div className="chips">
             {FLOWS.map((x) => <button key={x.v} type="button" className="chip berry" aria-pressed={log.flow === x.v} onClick={() => set({ flow: log.flow === x.v ? undefined : x.v })}>{x.label}</button>)}
           </div>
@@ -416,11 +534,11 @@ export function LogDay() {
         </LogSection>
       )}
 
-      <LogSection title="Symptoms">
+      <LogSection id="log-symptoms" title="Symptoms" hint={common.length ? 'Ones you often log around this point in your cycle come first.' : undefined}>
         <div className="chips">
-          {SYMPTOMS.filter((x) => s.goal === 'perimenopause' || !['hot flush', 'night sweats'].includes(x) || log.symptoms?.includes(x)).map((x) => {
+          {orderedSymptoms.filter((x) => s.goal === 'perimenopause' || !['hot flush', 'night sweats'].includes(x) || log.symptoms?.includes(x)).map((x) => {
             const on = !!log.symptoms?.includes(x);
-            return <button key={x} type="button" className="chip" aria-pressed={on} onClick={() => set({ symptoms: on ? log.symptoms!.filter((y) => y !== x) : [...(log.symptoms ?? []), x] })}>{x}</button>;
+            return <button key={x} type="button" className="chip" aria-pressed={on} onClick={() => set({ symptoms: on ? log.symptoms!.filter((y) => y !== x) : [...(log.symptoms ?? []), x] })}>{common.includes(x) && <i className="hint-dot" aria-hidden="true" />}{x}</button>;
           })}
         </div>
         <div className="stack" style={{ '--gap': '6px' } as React.CSSProperties}>
@@ -434,12 +552,15 @@ export function LogDay() {
         </div>
       </LogSection>
 
-      <LogSection title="Mood & energy">
+      <LogSection id="log-mood" title="Mood & energy">
         <div className="chips">
           {MOODS.map((m) => <button key={m} type="button" className="chip" aria-pressed={log.mood === m} onClick={() => set({ mood: log.mood === m ? undefined : m })}>{m}</button>)}
         </div>
         <Scale label="Energy" value={log.energy} onChange={(v) => set({ energy: v })} />
-        <Scale label="Sleep quality" value={log.sleep} onChange={(v) => set({ sleep: v })} />
+      </LogSection>
+
+      <LogSection id="log-sleep" title="Sleep">
+        <Scale label="Sleep quality" value={log.sleep} onChange={(v) => set({ sleep: v })} lowHigh={['Poor', 'Great']} />
       </LogSection>
 
       {s.fertilitySigns && !data.pregnancy && (
@@ -476,27 +597,55 @@ export function LogDay() {
       )}
 
       <LogSection title="Note">
-        <textarea
-          key={date} className="input" maxLength={2000} defaultValue={log.note ?? ''} aria-label="Private note" placeholder="Anything you want to remember. Stays on this device."
-          onChange={(e) => set({ note: e.target.value.trim() ? e.target.value : undefined })}
-        />
+        <NoteField key={date} initial={log.note ?? ''} onChange={(v) => set({ note: v.trim() ? v : undefined })} />
       </LogSection>
 
-      <button className="btn block" onClick={() => { showToast('Saved on this device'); navigate('/app'); }}>Done</button>
+      <div className="saved-bar">
+        <span className="row" style={{ '--gap': '10px' } as React.CSSProperties}>
+          <span className="tick" aria-hidden="true"><Icon name="check" size={15} /></span>
+          <span className="small" aria-live="polite"><strong>{entryCount ? `${entryCount} ${entryCount === 1 ? 'entry' : 'entries'}` : 'Nothing yet'}</strong>{date === today ? ' today' : ''} · saved on this device</span>
+        </span>
+        <button className="btn" onClick={() => { showToast('Saved on this device'); navigate('/app'); }}>Done</button>
+      </div>
     </div>
   );
 }
 
-function LogSection({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+const NOTE_MAX = 2000;
+
+/** Private note with a visible limit, so nothing is cut off without warning. */
+function NoteField({ initial, onChange }: { initial: string; onChange: (v: string) => void }) {
+  const [len, setLen] = useState(initial.length);
+  const near = len >= NOTE_MAX - 200;
   return (
-    <section className="card stack" style={{ '--gap': '12px' } as React.CSSProperties}>
+    <div className="stack" style={{ '--gap': '6px' } as React.CSSProperties}>
+      <textarea
+        className="input" maxLength={NOTE_MAX} defaultValue={initial} aria-label="Private note" aria-describedby="note-count" placeholder="Anything you want to remember. Stays on this device."
+        onChange={(e) => { setLen(e.target.value.length); onChange(e.target.value); }}
+      />
+      <span id="note-count" className={`tiny ${near ? '' : 'faint'}`} style={near ? { color: 'var(--berry-ink)' } : undefined} aria-live={near ? 'polite' : 'off'}>
+        {len >= NOTE_MAX ? `Limit reached: notes can be up to ${NOTE_MAX} characters.` : `${len} / ${NOTE_MAX}`}
+      </span>
+    </div>
+  );
+}
+
+function countEntries(l?: DayLog): number {
+  if (!l) return 0;
+  const { date: _d, symptoms, ...rest } = l;
+  return (symptoms?.length ?? 0) + Object.values(rest).filter((v) => v !== undefined && v !== false && v !== '').length;
+}
+
+function LogSection({ id, title, hint, children }: { id?: string; title: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <section id={id} className="card stack" style={{ '--gap': '12px', scrollMarginTop: 16 } as React.CSSProperties}>
       <div><h3>{title}</h3>{hint && <p className="small faint">{hint}</p>}</div>
       {children}
     </section>
   );
 }
 
-function Scale({ label, value, onChange }: { label: string; value?: Level; onChange: (v?: Level) => void }) {
+function Scale({ label, value, onChange, lowHigh = ['Low', 'High'] }: { label: string; value?: Level; onChange: (v?: Level) => void; lowHigh?: [string, string] }) {
   return (
     <div className="stack" style={{ '--gap': '6px' } as React.CSSProperties}>
       <span className="label">{label}</span>
@@ -505,7 +654,7 @@ function Scale({ label, value, onChange }: { label: string; value?: Level; onCha
           <button key={n} type="button" aria-pressed={value === n} aria-label={`${label} ${n} of 5`} onClick={() => onChange(value === n ? undefined : n)}>{n}</button>
         ))}
       </div>
-      <div className="row between tiny faint"><span>Low</span><span>High</span></div>
+      <div className="row between tiny faint"><span>{lowHigh[0]}</span><span>{lowHigh[1]}</span></div>
     </div>
   );
 }
@@ -513,16 +662,13 @@ function Scale({ label, value, onChange }: { label: string; value?: Level; onCha
 /* ------------------------------------------------------------------ Pregnancy home (used by Home) */
 
 function PregnancyHome() {
-  const { data, today } = useStore();
-  if (!data?.pregnancy) return null;
-  const st = pregnancyStatus(data.pregnancy, today, data.settings.cycle.typicalCycleLength);
   return (
-    <div className="stack" style={{ '--gap': '18px' } as React.CSSProperties}>
-      <PageTitle eyebrow="Pregnancy" title={st ? `Week ${st.week}${st.day ? ` + ${st.day}` : ''}` : 'Pregnancy mode'}>
-        {st ? `Estimated due date ${formatLong(st.dueDate)}${st.source === 'clinician' ? ' (from your clinician)' : ' (from your last period)'}.` : 'Add a due date or last period date to see your week.'}
-      </PageTitle>
-      <Link to="/app/pregnancy" className="btn">Open pregnancy calendar</Link>
-      <div className="callout">For any medical concern in pregnancy, contact your midwife, doctor or local emergency services. Ondessa cannot assess symptoms.</div>
-    </div>
+    <PregnancyView journal={
+      <section className="card stack" style={{ '--gap': '12px' } as React.CSSProperties}>
+        <div className="row between"><h3>Today’s journal</h3><Link to="/app/log" className="btn ghost">Open full log</Link></div>
+        <LogTiles />
+        <p className="small faint">Symptoms, mood and sleep stay private on this device.</p>
+      </section>
+    } />
   );
 }

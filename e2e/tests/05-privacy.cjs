@@ -139,7 +139,7 @@ module.exports = [
       assert.equal(await enc.isDisabled(), true);
       await page.getByLabel('Backup password', { exact: true }).fill('correct horse');
       let [dl] = await Promise.all([page.waitForEvent('download'), enc.click()]);
-      assert.equal(dl.suggestedFilename(), `ondessa-backup-${T}.encrypted.json`);
+      assert.equal(dl.suggestedFilename(), `ondessa-backup-${L.today()}.encrypted.json`); // date at download time, so a run across midnight still passes
       await dl.saveAs('/tmp/ondessa-e2e-p-enc.json');
       const encText = fs.readFileSync('/tmp/ondessa-e2e-p-enc.json', 'utf8');
       assert.equal(JSON.parse(encText).kind, 'encrypted');
@@ -152,13 +152,13 @@ module.exports = [
       assert.equal(got, false, 'plain export downloaded although the warning was cancelled');
       page.dialogAnswer = true;
       [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Unencrypted JSON' }).click()]);
-      assert.equal(dl.suggestedFilename(), `ondessa-backup-${T}.json`);
+      assert.equal(dl.suggestedFilename(), `ondessa-backup-${L.today()}.json`);
       await dl.saveAs('/tmp/ondessa-e2e-p-plain.json');
       const plain = JSON.parse(fs.readFileSync('/tmp/ondessa-e2e-p-plain.json', 'utf8'));
       assert.equal(plain.payload.logs[T].note, 'secret note');
       assert.ok(mon.dialogs.some((m) => /unencrypted export/.test(m)));
       await L.settle(page);
-      assert.equal((await L.readVault(page)).data.lastBackupOn, T);
+      assert.equal((await L.readVault(page)).data.lastBackupOn, L.today());
     },
   },
   {
@@ -208,9 +208,10 @@ module.exports = [
       await L.seed(page, richData(), { route: '/app/privacy' });
       await page.evaluate(() => sessionStorage.setItem('x', '1'));
       const btn = page.getByRole('button', { name: 'Permanently delete' });
-      await page.getByLabel('Type DELETE to confirm').fill('delete');
+      await page.getByLabel('Type DELETE to confirm').fill('delet');
       assert.equal(await btn.isDisabled(), true);
-      await page.getByLabel('Type DELETE to confirm').fill('DELETE');
+      await page.getByLabel('Type DELETE to confirm').fill(' delete ');
+      assert.equal(await btn.isDisabled(), false, 'any case is accepted');
       await btn.click();
       await page.waitForURL(/#\/deleted$/, { timeout: 10000 });
       assert.equal(await page.locator('h1').first().textContent(), 'Everything is deleted.');

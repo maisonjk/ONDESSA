@@ -9,6 +9,8 @@ export interface Reminder {
   title: string;
   /** Used for system notifications. Never contains health words when discreet is on. */
   notification: string;
+  /** Lock-screen quick replies offered with the notification, where the platform supports them. */
+  actions?: 'period-check';
 }
 
 const DISCREET = 'You have a gentle check-in from Ondessa.';
@@ -26,6 +28,15 @@ export function upcomingReminders(data: AppData, f: Forecast, today: ISODate, ho
         date,
         title: `Your period may start from ${formatShort(f.nextPeriod.earliest)}`,
         notification: say('Your period may start in the next few days.'),
+      });
+    }
+    if (r.periodHeadsUp && f.nextPeriod && f.daysPastExpected === 0) {
+      out.push({
+        id: 'period-check',
+        date: f.nextPeriod.expected,
+        title: 'Check in: has your period started?',
+        notification: r.discreet ? 'Quick check-in from Ondessa. One tap to update today.' : 'Has your period started? One tap to log it.',
+        actions: 'period-check',
       });
     }
     if (r.fertileWindow && f.fertile && data.settings.showFertility) {

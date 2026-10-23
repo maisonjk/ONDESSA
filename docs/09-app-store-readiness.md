@@ -15,18 +15,18 @@ Built from three independent audits on 2026-10-22: an App Store submission speci
 | Privacy manifest, Face ID text, icons, splash | ✅ |
 | Android target API 36, cloud backup off, no exact alarms | ✅ |
 | No preview pass in store builds | ✅ Enforced |
-| Data-loss and security fixes from code review | ✅ 70 unit tests + 111 end-to-end tests (all 13 QA bugs and 3 accessibility issues fixed and guarded) |
-| Clinical review of content and prediction thresholds | ❌ Blocker: needs a licensed clinician |
-| Final Privacy Policy and Terms | ❌ Blocker: drafts in `docs/legal/` need a lawyer |
-| Company details, support email, public URLs | ❌ Blocker: fill `src/content/company.ts` |
-| Trademark clearance for "Ondessa" | ❌ Needs counsel |
+| Data-loss and security fixes from code review | ✅ 85 unit tests + 139 end-to-end tests (all 13 QA bugs and 3 accessibility issues fixed and guarded) |
+| Health content framed as general information with sources | ✅ Enforced by release:check |
+| Final Privacy Policy and Terms | ✅ Finalized in-app and in `docs/legal/` (operator: Jiae Kim) |
+| Company details, support email, public URLs | ✅ Filled; URLs use the free Vercel address until a custom domain is bought |
+| Trademark clearance for "Ondessa" | ⚠ Search tmsearch.uspto.gov before launch |
 
 ## What only you can do, in order
 
 1. **Form the publishing entity** (LLC or similar) and get a D-U-N-S number. Apple guideline 5.1.1(ix) expects health apps to come from an organisation. New personal Google Play accounts also need a 12-tester, 14-day closed test.
 2. **Enrol** in the Apple Developer Program (organisation, $99/yr) and open a Google Play Console organisation account ($25 once).
 3. **Clear the name.** Get a trademark search from counsel. If you change the name, update `appId` in `capacitor.config.ts` and the display name.
-4. **Clinical review.** Have a licensed OB-GYN or certified nurse-midwife review every article in `src/content/library.ts`, the pregnancy week notes, and the thresholds in `src/engine/rules.ts`. Record name, credentials and date in each `review` field, and set a final `RULES.version`. Remove any article they won't sign off.
+4. **Content.** Articles and predictions are presented as general information with sources, not as medically reviewed. Don't add review claims to the app, the store listing or the review notes unless a qualified professional has actually reviewed the content.
 5. **Legal.** Have a lawyer finalise `docs/legal/privacy-policy.md` and `terms-of-use.md`, then update the in-app Privacy and Terms screens and remove the draft labels.
 6. **Fill in `src/content/company.ts`** and publish the web build so the Privacy, Terms and Help URLs are live.
 7. **Create the subscriptions:**
@@ -56,6 +56,10 @@ npx cap open android          # Android Studio
 2. Build an App Bundle (.aab).
 3. Upload it to an internal or closed test track.
 
+## Testing purchases from Xcode
+
+`ios/App/App/Ondessa.storekit` holds both subscriptions (yearly $59.99, monthly $8.99, 1-week free trial). In Xcode choose Product → Scheme → Edit Scheme → Run → Options → StoreKit Configuration → `Ondessa.storekit`. Purchases then run locally with no App Store Connect setup or charge; manage them under Debug → StoreKit → Manage Transactions. Set the scheme back to None to test against App Store Connect sandbox products.
+
 ## Device test plan (before every submission)
 
 | Area | Test |
@@ -64,6 +68,9 @@ npx cap open android          # Android Studio
 | Restore | Delete the app, reinstall, restore purchases; second device with the same Apple ID |
 | Expiry | Sandbox renewal and expiry (accelerated renewal times); refund (access removed after validation) |
 | Reminders | Enable each reminder; permission prompt appears only then; notification text is discreet; fires at 9:00 |
+| Check-in quick replies | On the expected day, long-press the check-in: "Yes, today" logs a period day, "Spotting" logs spotting, "Not yet" logs nothing; with a passcode set, the entry is applied after unlock |
+| Free trial | Configure an introductory free trial on both subscriptions in App Store Connect and Play Console; confirm Plans shows the timeline and "Start … free trial", and the local reminder fires 2 days before the end |
+| Sharing | Partner sharing opens the share sheet with only the switched-on items; the calendar file imports into Calendar with "Ondessa" titles when discreet wording is on |
 | Face ID | Enable, background for more than 5 minutes (auto-lock), unlock with Face ID, fall back to passcode, change passcode (Face ID turns off) |
 | Data | Log for several days, force-quit mid-edit, reopen (nothing lost); airplane mode (everything works); low-storage device |
 | Backup | Encrypted backup to Files; cancel the share sheet (no "last backup" recorded); restore on a fresh install before purchase |
@@ -72,7 +79,7 @@ npx cap open android          # Android Studio
 
 ## Reviewer notes (paste into App Store Connect)
 
-> Ondessa has no account or login; health data is stored only on the device. To test: tap "I understand, continue" and choose "Understand my cycle". Enter any recent date as the last period start and finish setup. The subscription screen appears; buy either plan with a Sandbox Apple ID. "Restore purchases" is on the same screen and under More → Membership. Reminders are under More → Reminders & settings, and Face ID unlock is under More → Privacy center once a passcode is set. The app does not use HealthKit. It is not a medical device and not a contraceptive; predictions are labelled as estimates with confidence levels, and each article lists its sources and clinical reviewer.
+> Ondessa has no account or login; health data is stored only on the device. To test: tap "I understand, continue" and choose "Understand my cycle". Enter any recent date as the last period start and finish setup. The subscription screen appears; buy either plan with a Sandbox Apple ID. "Restore purchases" is on the same screen and under You → Membership. Reminders are under You → Reminders & settings, and Face ID unlock is under You → Privacy center once a passcode is set. The app does not use HealthKit. It is not a medical device and not a contraceptive; predictions are labelled as estimates with confidence levels, and each article lists its sources. Content is general information, not medical advice.
 
 ## App Privacy (Apple) and Data safety (Google)
 

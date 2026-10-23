@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Regenerates every store screenshot, the Play feature graphic and icon from the real app.
-# Run after content or design changes, and after clinical review so badges read "Reviewed by".
+# Run after content or design changes.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 npx vitest run --config scripts/store/vitest.config.mjs

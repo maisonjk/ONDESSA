@@ -10,7 +10,7 @@ TRYING TO CONCEIVE
 See your best days with the honest range. Add LH tests, basal body temperature and cervical mucus if you want more detail, or skip them entirely.
 
 PREGNANCY, WEEK BY WEEK
-A calm week-by-week calendar, appointment reminders and space to note how you feel. Use your clinician's due date or let Ondessa estimate one.
+A calm week-by-week calendar, appointment reminders and space to note how you feel. Use the due date from your doctor or midwife or let Ondessa estimate one.
 
 IRREGULAR OR CHANGING CYCLES
 Support for perimenopause and irregular cycles that stays honest when your patterns shift.
@@ -28,5 +28,5 @@ Ondessa Membership is available as a yearly ($59.99) or monthly ($8.99) auto-ren
 IMPORTANT
 Ondessa provides estimates for understanding your body. It is not a medical device, does not diagnose any condition, cannot confirm ovulation or pregnancy, and is not a form of contraception. Talk to a healthcare professional about medical concerns.
 
-Terms of Use: https://ondessa.app/#/legal
-Privacy Policy: https://ondessa.app/#/privacy
+Terms of Use: https://v0-recreate-ui-from-screenshot-f8.vercel.app/#/legal
+Privacy Policy: https://v0-recreate-ui-from-screenshot-f8.vercel.app/#/privacy

@@ -1,5 +1,5 @@
 import { addDays, diffDays, formatShort, type ISODate } from './dates';
-import { mean } from './cycles';
+import { mean, median } from './cycles';
 import type { Forecast } from './predict';
 import { RULES } from './rules';
 import type { DayLog, Symptom } from './types';
@@ -16,6 +16,11 @@ export interface Insight {
   body: string;
   basis: string;
   limitation: string;
+  /** How many of the cycles looked at showed this pattern, for an at-a-glance evidence strip. */
+  evidence?: { hits: number; total: number; label: string };
+  /** Symptom patterns only: the symptom and how many days before a period it usually starts. */
+  symptom?: Symptom;
+  leadDays?: number;
 }
 
 const CORRELATION_NOTE =
@@ -63,12 +68,17 @@ export function findPatterns(f: Forecast, logs: Record<ISODate, DayLog>): Insigh
   const recentCycles = usable.slice(-6);
   if (recentCycles.length >= P.minCyclesForSymptomPattern) {
     const counts = new Map<Symptom, number>();
+    // Earliest day before the period each symptom was logged, per cycle, for "heads up" timing.
+    const leads = new Map<Symptom, number[]>();
     for (const c of recentCycles) {
-      const seen = new Set<Symptom>();
+      const first = new Map<Symptom, number>();
       for (let d = 1; d <= P.preMenstrualDays; d++) {
-        for (const s of logs[addDays(c.nextStart, -d)]?.symptoms ?? []) seen.add(s);
+        for (const s of logs[addDays(c.nextStart, -d)]?.symptoms ?? []) first.set(s, d);
       }
-      for (const s of seen) counts.set(s, (counts.get(s) ?? 0) + 1);
+      for (const [s, d] of first) {
+        counts.set(s, (counts.get(s) ?? 0) + 1);
+        leads.set(s, [...(leads.get(s) ?? []), d]);
+      }
     }
     const ranked = [...counts.entries()]
       .filter(([, n]) => n >= P.minCyclesForSymptomPattern && n / recentCycles.length >= P.symptomRatio)
@@ -82,6 +92,9 @@ export function findPatterns(f: Forecast, logs: Record<ISODate, DayLog>): Insigh
         body: `You logged ${pluralSymptom(symptom)} in the ${P.preMenstrualDays} days before your period in ${n} of your last ${recentCycles.length} cycles.`,
         basis: `Cycles starting ${formatShort(recentCycles[0]!.start)} to ${formatShort(recentCycles[recentCycles.length - 1]!.start)}.`,
         limitation: CORRELATION_NOTE,
+        evidence: { hits: n, total: recentCycles.length, label: `${n} of your last ${recentCycles.length} cycles` },
+        symptom,
+        leadDays: Math.round(median(leads.get(symptom) ?? [1])),
       });
     }
   }
@@ -96,7 +109,11 @@ export function findPatterns(f: Forecast, logs: Record<ISODate, DayLog>): Insigh
         f.irregular ? ' Ondessa shows a wider prediction window to reflect that.' : ''
       }`,
       basis: `Last ${lens.length} complete cycles.`,
-      limitation: 'Some variation is normal. Variation of more than 7–9 days can be worth mentioning to a clinician.',
+      evidence: (() => {
+        const near = lens.filter((l) => Math.abs(l - f.predictedCycleLength) <= RULES.windowHalfWidth.developing).length;
+        return { hits: near, total: lens.length, label: `${near} of ${lens.length} within ${RULES.windowHalfWidth.developing} days of your usual length` };
+      })(),
+      limitation: 'Some variation is normal. Variation of more than 7–9 days can be worth mentioning to a doctor.',
     });
   }
 
