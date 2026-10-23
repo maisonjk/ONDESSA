@@ -5,7 +5,7 @@
  */
 export const REVENUECAT_KEYS = {
   /** Starts with "appl_". */
-  apple: '',
+  apple: 'appl_nKEFzEBzjhXVFflokracpXcrHdb',
   /** Starts with "goog_". Leave empty until the Android app is set up. */
   google: '',
 };
