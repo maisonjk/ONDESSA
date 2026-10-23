@@ -1,14 +1,14 @@
 import { isNative, platform } from './index';
+import { REVENUECAT_KEYS, ENTITLEMENT_ID } from './billing-config';
 
 /**
- * Subscriptions through Apple In-App Purchase and Google Play Billing (cordova-plugin-purchase).
- * Required for the store builds: digital subscriptions sold inside an iOS or Android app
- * must use the platform's billing. No account, email or health data is involved; the
- * stores identify the purchase by the device's store account.
+ * Subscriptions through Apple In-App Purchase and Google Play Billing, via RevenueCat.
+ * RevenueCat validates every receipt with Apple or Google on its servers, so expiry,
+ * refunds and family sharing are enforced without a server of our own.
  *
- * Before launch (see docs/09-app-store-readiness.md): enable the StoreKit 2 extension,
- * add server receipt validation so expiry and refunds are enforced, and test every path
- * in the App Store sandbox and Play test tracks.
+ * Privacy: RevenueCat receives purchase records tied to an anonymous, random app user ID.
+ * No name, email or health data is ever sent. Attribution and ad-network integrations
+ * stay off, and we never set subscriber attributes.
  */
 export type StorePlan = 'monthly' | 'annual';
 
@@ -23,87 +23,75 @@ export interface StoreProduct {
   price: string;
   /** Store price in millionths of the local currency, for comparing plans. */
   priceMicros?: number;
-  /** Introductory free trial configured in App Store Connect / Play Console, if offered. */
+  /** Introductory free trial, shown only when this store account is still eligible. */
   trial?: { days: number; label: string };
 }
 
 export type PurchaseResult = 'purchased' | 'cancelled' | 'unavailable' | 'error';
 
-// Minimal typing for the subset of the plugin's global API used here.
-interface CdvPhase { paymentMode?: string; billingPeriod?: string }
-interface CdvOffer { id: string; pricingPhases?: CdvPhase[] }
-interface CdvProduct {
-  id: string;
-  pricing?: { price: string; priceMicros?: number };
-  offers?: CdvOffer[];
-  getOffer(id?: string): CdvOffer | undefined;
-}
-interface CdvError { code: number; message: string }
-interface CdvStore {
-  register(p: { id: string; type: string; platform: string }[]): void;
-  initialize(platforms: string[]): Promise<CdvError[]>;
-  when(): { approved(cb: (t: { finish(): Promise<void> }) => void): unknown; productUpdated(cb: () => void): unknown };
-  get(id: string, platform?: string): CdvProduct | undefined;
-  owned(id: string): boolean;
-  order(offer: CdvOffer): Promise<CdvError | undefined>;
-  restorePurchases(): Promise<CdvError | undefined>;
-  manageSubscriptions(platform?: string): Promise<CdvError | undefined>;
-}
-interface CdvGlobal {
-  store: CdvStore;
-  ProductType: { PAID_SUBSCRIPTION: string };
-  Platform: { APPLE_APPSTORE: string; GOOGLE_PLAY: string };
-  ErrorCode: { PAYMENT_CANCELLED: number };
-}
+type RC = typeof import('@revenuecat/purchases-capacitor').Purchases;
+type RCProduct = import('@revenuecat/purchases-capacitor').PurchasesStoreProduct;
+type RCCustomerInfo = import('@revenuecat/purchases-capacitor').CustomerInfo;
 
-declare global {
-  interface Window {
-    CdvPurchase?: CdvGlobal;
-  }
-}
+const INELIGIBLE = 1; // INTRO_ELIGIBILITY_STATUS_INELIGIBLE
+const CANCELLED = '1'; // PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR
 
-let ready: Promise<CdvGlobal | undefined> | undefined;
+let ready: Promise<RC | undefined> | undefined;
 const listeners = new Set<() => void>();
+const products = new Map<StorePlan, RCProduct>();
 
-function deviceReady(): Promise<void> {
-  return new Promise((resolve) => {
-    if (window.CdvPurchase) return resolve();
-    document.addEventListener('deviceready', () => resolve(), { once: true });
-    setTimeout(resolve, 5000); // never hang the paywall
-  });
+function apiKey(): string {
+  return platform === 'android' ? REVENUECAT_KEYS.google : REVENUECAT_KEYS.apple;
 }
 
-function storePlatform(C: CdvGlobal): string {
-  return platform === 'android' ? C.Platform.GOOGLE_PLAY : C.Platform.APPLE_APPSTORE;
-}
-
-async function api(): Promise<CdvGlobal | undefined> {
-  if (!isNative) return undefined;
+async function api(): Promise<RC | undefined> {
+  if (!isNative || !apiKey()) return undefined;
   ready ??= (async () => {
-    await deviceReady();
-    const C = window.CdvPurchase;
-    if (!C) return undefined;
-    const p = storePlatform(C);
-    C.store.register(Object.values(PRODUCT_IDS).map((id) => ({ id, type: C.ProductType.PAID_SUBSCRIPTION, platform: p })));
-    C.store.when().approved((t) => void t.finish());
-    C.store.when().productUpdated(() => listeners.forEach((l) => l()));
-    await C.store.initialize([p]);
-    return C;
+    try {
+      const { Purchases } = await import('@revenuecat/purchases-capacitor');
+      await Purchases.configure({ apiKey: apiKey() });
+      await Purchases.addCustomerInfoUpdateListener(() => listeners.forEach((l) => l()));
+      return Purchases;
+    } catch {
+      ready = undefined; // allow a retry, e.g. after the network comes back
+      return undefined;
+    }
   })();
   return ready;
 }
 
+function planFor(productId: string): StorePlan | undefined {
+  // Google returns "productId:basePlanId"; compare the product part only.
+  const id = productId.split(':')[0];
+  return (Object.keys(PRODUCT_IDS) as StorePlan[]).find((p) => PRODUCT_IDS[p] === id);
+}
+
+function activePlan(info: RCCustomerInfo): StorePlan | undefined {
+  const ent = info.entitlements.active[ENTITLEMENT_ID];
+  if (ent?.isActive) return planFor(ent.productIdentifier) ?? 'annual';
+  return undefined;
+}
+
 /** Products with store-localised prices. Empty when billing is unavailable. */
 export async function loadProducts(): Promise<StoreProduct[]> {
-  const C = await api();
-  if (!C) return [];
-  return (Object.keys(PRODUCT_IDS) as StorePlan[]).flatMap((plan) => {
-    const p = C.store.get(PRODUCT_IDS[plan], storePlatform(C));
-    if (!p?.pricing) return [];
-    const phase = p.offers?.flatMap((o) => o.pricingPhases ?? []).find((ph) => ph.paymentMode === 'FreeTrial');
-    const trial = phase?.billingPeriod ? parseTrial(phase.billingPeriod) : undefined;
-    return [{ plan, price: p.pricing.price, ...(p.pricing.priceMicros ? { priceMicros: p.pricing.priceMicros } : {}), ...(trial ? { trial } : {}) }];
-  });
+  const P = await api();
+  if (!P) return [];
+  try {
+    const ids = Object.values(PRODUCT_IDS);
+    const { products: list } = await P.getProducts({ productIdentifiers: ids });
+    const eligibility = await P.checkTrialOrIntroductoryPriceEligibility({ productIdentifiers: ids }).catch(() => ({}) as Record<string, { status: number }>);
+    return list.flatMap((p) => {
+      const plan = planFor(p.identifier);
+      if (!plan) return [];
+      products.set(plan, p);
+      const intro = p.introPrice;
+      const eligible = eligibility[p.identifier]?.status !== INELIGIBLE;
+      const trial = intro && intro.price === 0 && eligible ? parseTrial(intro.period) : undefined;
+      return [{ plan, price: p.priceString, priceMicros: Math.round(p.price * 1_000_000), ...(trial ? { trial } : {}) }];
+    });
+  } catch {
+    return [];
+  }
 }
 
 /** ISO 8601 period ("P14D", "P1W", "P1M") to a day count and a readable label. */
@@ -118,11 +106,12 @@ export function parseTrial(period: string): { days: number; label: string } | un
   return days > 0 ? { days, label } : undefined;
 }
 
-/** The plan this device's store account currently owns, if any. */
+/** The plan this store account currently has an active, validated membership for, if any. */
 export async function ownedPlan(): Promise<StorePlan | undefined> {
-  const C = await api();
-  if (!C) return undefined;
-  return (Object.keys(PRODUCT_IDS) as StorePlan[]).find((plan) => C.store.owned(PRODUCT_IDS[plan]));
+  const P = await api();
+  if (!P) return undefined;
+  const { customerInfo } = await P.getCustomerInfo();
+  return activePlan(customerInfo);
 }
 
 export function onStoreChange(cb: () => void): () => void {
@@ -131,25 +120,42 @@ export function onStoreChange(cb: () => void): () => void {
 }
 
 export async function purchase(plan: StorePlan): Promise<PurchaseResult> {
-  const C = await api();
-  if (!C) return 'unavailable';
+  const P = await api();
+  if (!P) return 'unavailable';
   // Never charge twice for the same membership.
-  if (await ownedPlan()) return 'purchased';
-  const offer = C.store.get(PRODUCT_IDS[plan], storePlatform(C))?.getOffer();
-  if (!offer) return 'unavailable';
-  const err = await C.store.order(offer);
-  if (!err) return 'purchased';
-  return err.code === C.ErrorCode.PAYMENT_CANCELLED ? 'cancelled' : 'error';
+  if (await ownedPlan().catch(() => undefined)) return 'purchased';
+  if (!products.has(plan)) await loadProducts();
+  const product = products.get(plan);
+  if (!product) return 'unavailable';
+  try {
+    const { customerInfo } = await P.purchaseStoreProduct({ product });
+    return activePlan(customerInfo) ? 'purchased' : 'error';
+  } catch (e) {
+    const err = e as { code?: string; userCancelled?: boolean | null };
+    return err.userCancelled || err.code === CANCELLED ? 'cancelled' : 'error';
+  }
 }
 
 export async function restorePurchases(): Promise<StorePlan | undefined> {
-  const C = await api();
-  if (!C) return undefined;
-  await C.store.restorePurchases();
-  return ownedPlan();
+  const P = await api();
+  if (!P) return undefined;
+  try {
+    const { customerInfo } = await P.restorePurchases();
+    return activePlan(customerInfo);
+  } catch {
+    return undefined;
+  }
 }
 
+const MANAGE_URL = {
+  ios: 'https://apps.apple.com/account/subscriptions',
+  android: 'https://play.google.com/store/account/subscriptions',
+};
+
 export async function manageSubscription(): Promise<void> {
-  const C = await api();
-  if (C) await C.store.manageSubscriptions(storePlatform(C));
+  const P = await api();
+  const info = P ? await P.getCustomerInfo().then((r) => r.customerInfo).catch(() => undefined) : undefined;
+  const url = info?.managementURL ?? (platform === 'android' ? MANAGE_URL.android : MANAGE_URL.ios);
+  const { Browser } = await import('@capacitor/browser');
+  await Browser.open({ url });
 }

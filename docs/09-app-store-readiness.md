@@ -32,7 +32,7 @@ Built from three independent audits on 2026-10-22: an App Store submission speci
 7. **Create the subscriptions:**
    - App Store Connect: subscription group "Ondessa Membership" with `ondessa.membership.annual` ($59.99/yr) and `ondessa.membership.monthly` ($8.99/mo). Add localised display names and a review screenshot of the paywall.
    - Google Play Console: same IDs, as subscriptions with one base plan each.
-8. **Finish the purchase plumbing.** Enable the cordova-plugin-purchase StoreKit 2 extension, and add receipt validation (your own small endpoint or a validator service) so expiry, refunds and family sharing are enforced. Then update the App Privacy answers below if a server stores purchase records.
+8. **RevenueCat.** Purchases run through RevenueCat (`src/platform/purchases.ts`), which validates receipts so expiry, refunds and family sharing are enforced. In the RevenueCat project "Ondessa": upload the App Store In-App Purchase key, create the entitlement `membership`, attach both products to it, and put the app's public `appl_` key in `src/platform/billing-config.ts`. Keep attribution and ad integrations off.
 9. **Build and test on real devices.** Steps below.
 10. **Run `npm run release:check`** until it passes, then submit.
 
@@ -85,8 +85,7 @@ npx cap open android          # Android Studio
 
 | Configuration | Apple App Privacy | Google Data safety |
 |---|---|---|
-| StoreKit / Play Billing only, no server | **Data Not Collected** | No data collected or shared |
-| With a receipt-validation server storing transactions | Purchases → Purchase History (App Functionality, not linked, no tracking) | Purchase history, collected, not shared, for app functionality |
+| Purchases validated by RevenueCat (current) | **Purchases → Purchase History**: App Functionality, not linked to the user's identity, not used for tracking | Purchase history: collected, not shared, processed for app functionality |
 
 - **Tracking:** none, so no tracking-permission prompt.
 - **Encryption export compliance:** `ITSAppUsesNonExemptEncryption` is set to `NO`. The app uses only standard OS encryption to protect user data on the device. Confirm with counsel if unsure.
@@ -117,7 +116,6 @@ npx cap open android          # Android Studio
 
 ## Known limitations to disclose or fix later
 
-- Purchase entitlement is checked on the device until receipt validation is added (step 8).
 - iCloud device backups can include app data (disclosed in the privacy policy). Passcode-encrypted data stays encrypted.
 - A 4–6 digit passcode protects against casual access. It does not protect against forensic attacks (see ADR-0005). Face ID unlock uses the keychain on this device only.
 
