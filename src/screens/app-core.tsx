@@ -238,16 +238,25 @@ export function Home() {
 }
 
 /** One row of the app's main tools at the top of Today, so nothing is buried in the You tab. */
-function Shortcuts({ completedCycles }: { completedCycles: number }) {
-  const { tour } = useStore();
+function Shortcuts({ completedCycles, pregnant }: { completedCycles?: number; pregnant?: boolean }) {
+  const { tour, data } = useStore();
   const seen = tour ? ['share', 'recap'] : visited();
-  const items = [
-    { to: '/app/recap', icon: 'chart', label: 'Recap', isNew: completedCycles > 0 && !seen.includes('recap') },
-    { to: '/app/share', icon: 'people', label: 'Share', isNew: !seen.includes('share') },
-    { to: '/app/history', icon: 'history', label: 'Past periods' },
-    { to: '/app/fertility', icon: 'leaf', label: 'Fertility' },
-    { to: '/app/you', icon: 'menu', label: 'All tools' },
-  ];
+  const showFertility = !!data?.settings.showFertility;
+  const items: { to: string; icon: string; label: string; isNew?: boolean }[] = pregnant
+    ? [
+      { to: '/app/log', icon: 'plus', label: 'Journal' },
+      { to: '/app/library/pregnancy-when-to-call', icon: 'info', label: 'When to call' },
+      { to: '/app/library', icon: 'book', label: 'Library' },
+      { to: '/app/settings', icon: 'bell', label: 'Reminders' },
+      { to: '/app/you', icon: 'menu', label: 'All tools' },
+    ]
+    : [
+      { to: '/app/recap', icon: 'chart', label: 'Recap', isNew: (completedCycles ?? 0) > 0 && !seen.includes('recap') },
+      { to: '/app/share', icon: 'people', label: 'Share', isNew: !seen.includes('share') },
+      { to: '/app/history', icon: 'history', label: 'Past periods' },
+      showFertility ? { to: '/app/fertility', icon: 'leaf', label: 'Fertility' } : { to: '/app/library', icon: 'book', label: 'Library' },
+      { to: '/app/you', icon: 'menu', label: 'All tools' },
+    ];
   return (
     <nav className="shortcuts" aria-label="Tools">
       {items.map((i) => (
@@ -716,6 +725,8 @@ function Scale({ label, value, onChange, lowHigh = ['Low', 'High'] }: { label: s
 
 function PregnancyHome() {
   return (
+    <div className="stack" style={{ '--gap': '14px' } as React.CSSProperties}>
+    <Shortcuts pregnant />
     <PregnancyView journal={
       <section className="card stack" style={{ '--gap': '12px' } as React.CSSProperties}>
         <div className="row between"><h3>Today’s journal</h3><Link to="/app/log" className="btn ghost">Open full log</Link></div>
@@ -723,5 +734,6 @@ function PregnancyHome() {
         <p className="small faint">Symptoms, mood and sleep stay private on this device.</p>
       </section>
     } />
+    </div>
   );
 }
