@@ -50,7 +50,9 @@ async function api(): Promise<RC | undefined> {
     try {
       const { Purchases } = await import('@revenuecat/purchases-capacitor');
       await Purchases.configure({ apiKey: apiKey() });
-      await Purchases.addCustomerInfoUpdateListener(() => listeners.forEach((l) => l()));
+      // Not awaited: this is a callback-style call, and on iOS its promise does not settle
+      // until the first update arrives. Awaiting it left the app on a blank loading screen.
+      void Purchases.addCustomerInfoUpdateListener(() => listeners.forEach((l) => l())).catch(() => {});
       return Purchases;
     } catch {
       ready = undefined; // allow a retry, e.g. after the network comes back
@@ -108,10 +110,15 @@ export function parseTrial(period: string): { days: number; label: string } | un
 
 /** The plan this store account currently has an active, validated membership for, if any. */
 export async function ownedPlan(): Promise<StorePlan | undefined> {
-  const P = await api();
+  const P = await withTimeout(api(), 8000);
   if (!P) return undefined;
-  const { customerInfo } = await P.getCustomerInfo();
-  return activePlan(customerInfo);
+  // Never let a slow network or store keep the app on a loading screen.
+  const info = await withTimeout(P.getCustomerInfo().then((r) => r.customerInfo), 8000);
+  return info ? activePlan(info) : undefined;
+}
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | undefined> {
+  return Promise.race([p, new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), ms))]);
 }
 
 export function onStoreChange(cb: () => void): () => void {
