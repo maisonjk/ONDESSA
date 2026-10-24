@@ -47,7 +47,10 @@ const config = read('capacitor.config.ts');
 if (config.includes("appId: 'com.ondessa.app'")) manual.push('Bundle ID is the placeholder com.ondessa.app. Confirm it matches App Store Connect and Play Console.');
 manual.push('Trademark clearance for the app name (USPTO/EUIPO search by counsel).');
 manual.push('Subscriptions created in App Store Connect and Play Console with IDs ondessa.membership.annual / ondessa.membership.monthly.');
-manual.push('StoreKit 2 extension enabled and server receipt validation added (src/platform/purchases.ts).');
+const billing = read('src/platform/billing-config.ts');
+check(/apple: 'appl_[A-Za-z0-9]+'/.test(billing), 'RevenueCat Apple key set', 'Add the RevenueCat public Apple key (appl_...) to src/platform/billing-config.ts.');
+check(!/sk_[A-Za-z0-9]/.test(billing), 'No RevenueCat secret key in the app', 'Remove the secret key (sk_...) from src/platform/billing-config.ts. Only public keys belong in the app.');
+manual.push('RevenueCat: In-App Purchase key uploaded, entitlement "membership" with both products, sandbox purchase, restore and refund tested.');
 manual.push('Tested on real devices: purchase, restore, cancel, refund, reminders, Face ID, backup/restore, offline.');
 manual.push('App Privacy, Data safety, age rating and Health apps declaration forms completed (docs/09-app-store-readiness.md).');
 

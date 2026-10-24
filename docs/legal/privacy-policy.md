@@ -27,7 +27,8 @@ We cannot access this information. We have no copy of it and cannot recover it f
 
 | What | Who receives it | Why |
 |---|---|---|
-| Purchase and subscription status | Apple (App Store) or Google (Google Play) | To process your subscription. They act under their own privacy policies. We receive subscription status and transaction records that do not include your health information. |
+| Purchase and subscription status | Apple (App Store) or Google (Google Play) | To process your subscription. They act under their own privacy policies. |
+| Purchase records (product, dates, price, store transaction ID) and a random app user ID | RevenueCat, Inc., our subscription service provider | To validate purchases with Apple or Google and keep your membership status correct (renewals, refunds, expiry). It does not receive your name, email or health information, and we do not use it for advertising or tracking. |
 | Support emails you send | Gmail (Google), at innerlink24@gmail.com | To answer you. Please don't include health information. |
 | Web visits to our website | Vercel (hosting) | Standard server logs (IP address, browser type, page requested), kept for the shortest period the host allows, for security. App screens are not in these logs. |
 

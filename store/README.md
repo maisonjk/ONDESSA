@@ -51,9 +51,8 @@ Answer **None** to everything except:
 Expected result: 12+. Do not choose "Made for Kids".
 
 ### App Privacy ("nutrition label")
-Select **Data Not Collected**. This is accurate because health data never leaves the device, there is no account, no analytics SDK and no ads SDK. Purchases go through Apple and are not collected by Ondessa.
+Select **Purchases → Purchase History** only: used for App Functionality, **not** linked to the user's identity, **not** used for tracking. RevenueCat validates purchases using a random app user ID. Health data never leaves the device, and there is no account, analytics SDK or ads SDK, so nothing else is collected.
 
-If you later add server-side receipt validation, the transaction ID becomes "Purchases, not linked to identity, App Functionality". Update the label the same day.
 
 ### Subscriptions
 Create one subscription group.

@@ -119,7 +119,7 @@ module.exports = [
       await L.seed(page, L.emptyData(T, { logs: L.addPeriod({}, last, 5), settings: { goal: 'conceive', showFertility: true } }));
       const nextOv = L.addDays(last, 28 + 14);
       const range = `${L.formatShort(L.addDays(nextOv, -5))}`;
-      const card = await page.locator('a[href="#/app/fertility"]').innerText();
+      const card = await page.locator('a.card[href="#/app/fertility"]').innerText();
       assert.ok(/next fertile window/i.test(card), card);
       assert.ok(card.includes(range), `${card} should start ${range}`);
       await L.hashGo(page, '/app/fertility');
@@ -134,7 +134,7 @@ module.exports = [
     async run() {
       const { page } = await L.open();
       await L.seed(page, L.emptyData(T, { logs: L.addPeriod({}, L.addDays(T, -48), 5), settings: { goal: 'conceive', showFertility: true } }));
-      const card = page.locator('a[href="#/app/fertility"]');
+      const card = page.locator('a.card[href="#/app/fertility"]');
       if (await card.count()) {
         const t = await card.innerText();
         assert.ok(!t.includes(L.formatShort(L.addDays(T, -6))), `past window advertised as next: ${t}`);

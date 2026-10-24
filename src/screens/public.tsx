@@ -525,7 +525,7 @@ export function PrivacyPolicy() {
         <h2>What stays on your device</h2>
         <p>Everything you log: periods, symptoms, moods, temperatures, tests, notes, pregnancy details and appointments, along with every prediction and insight. Calculations run on your device.</p>
         <h2>What leaves your device</h2>
-        <p>In this version, nothing about your health. Loading the app downloads its files from our static host, which, like any web server, sees your IP address and browser type. When subscriptions go live, the payment provider processes your purchase, and the app may check your membership key. That key contains a random ID, your plan and an expiry date.</p>
+        <p>In this version, nothing about your health. Loading the app downloads its files from our static host, which, like any web server, sees your IP address and browser type. When you subscribe in the iPhone or Android app, Apple or Google processes the payment, and RevenueCat, our subscription service, checks it with them so your membership works and renews correctly. RevenueCat receives the purchase record and a random ID created by the app. It never receives your name, email or any health information.</p>
         <p>If you choose to share an update, a cycle recap or a calendar file, Ondessa hands it to the app you pick (Messages, email, your calendar) and you send it. We never receive it, and it contains only what you switched on.</p>
         <h2>What we never do</h2>
         <ul>
