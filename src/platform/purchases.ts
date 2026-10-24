@@ -36,7 +36,13 @@ type RCCustomerInfo = import('@revenuecat/purchases-capacitor').CustomerInfo;
 const INELIGIBLE = 1; // INTRO_ELIGIBILITY_STATUS_INELIGIBLE
 const CANCELLED = '1'; // PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR
 
-let ready: Promise<RC | undefined> | undefined;
+/**
+ * Capacitor plugin objects are proxies that answer every property, including `then`, so
+ * one must never be returned from an async function or passed to `await` directly: the
+ * runtime treats it as a promise and the call never settles. Keep it inside a box.
+ */
+type Box = { P: RC };
+let ready: Promise<Box | undefined> | undefined;
 const listeners = new Set<() => void>();
 const products = new Map<StorePlan, RCProduct>();
 
@@ -44,7 +50,7 @@ function apiKey(): string {
   return platform === 'android' ? REVENUECAT_KEYS.google : REVENUECAT_KEYS.apple;
 }
 
-async function api(): Promise<RC | undefined> {
+async function api(): Promise<Box | undefined> {
   if (!isNative || !apiKey()) return undefined;
   ready ??= (async () => {
     try {
@@ -53,7 +59,7 @@ async function api(): Promise<RC | undefined> {
       // Not awaited: this is a callback-style call, and on iOS its promise does not settle
       // until the first update arrives. Awaiting it left the app on a blank loading screen.
       void Purchases.addCustomerInfoUpdateListener(() => listeners.forEach((l) => l())).catch(() => {});
-      return Purchases;
+      return { P: Purchases };
     } catch {
       ready = undefined; // allow a retry, e.g. after the network comes back
       return undefined;
@@ -76,7 +82,7 @@ function activePlan(info: RCCustomerInfo): StorePlan | undefined {
 
 /** Products with store-localised prices. Empty when billing is unavailable. */
 export async function loadProducts(): Promise<StoreProduct[]> {
-  const P = await api();
+  const P = (await api())?.P;
   if (!P) return [];
   try {
     const ids = Object.values(PRODUCT_IDS);
@@ -110,7 +116,7 @@ export function parseTrial(period: string): { days: number; label: string } | un
 
 /** The plan this store account currently has an active, validated membership for, if any. */
 export async function ownedPlan(): Promise<StorePlan | undefined> {
-  const P = await withTimeout(api(), 8000);
+  const P = (await withTimeout(api(), 8000))?.P;
   if (!P) return undefined;
   // Never let a slow network or store keep the app on a loading screen.
   const info = await withTimeout(P.getCustomerInfo().then((r) => r.customerInfo), 8000);
@@ -127,7 +133,7 @@ export function onStoreChange(cb: () => void): () => void {
 }
 
 export async function purchase(plan: StorePlan): Promise<PurchaseResult> {
-  const P = await api();
+  const P = (await api())?.P;
   if (!P) return 'unavailable';
   // Never charge twice for the same membership.
   if (await ownedPlan().catch(() => undefined)) return 'purchased';
@@ -144,7 +150,7 @@ export async function purchase(plan: StorePlan): Promise<PurchaseResult> {
 }
 
 export async function restorePurchases(): Promise<StorePlan | undefined> {
-  const P = await api();
+  const P = (await api())?.P;
   if (!P) return undefined;
   try {
     const { customerInfo } = await P.restorePurchases();
@@ -160,7 +166,7 @@ const MANAGE_URL = {
 };
 
 export async function manageSubscription(): Promise<void> {
-  const P = await api();
+  const P = (await api())?.P;
   const info = P ? await P.getCustomerInfo().then((r) => r.customerInfo).catch(() => undefined) : undefined;
   const url = info?.managementURL ?? (platform === 'android' ? MANAGE_URL.android : MANAGE_URL.ios);
   const { Browser } = await import('@capacitor/browser');
