@@ -8,6 +8,9 @@ import { Capacitor } from '@capacitor/core';
  */
 export const isNative = Capacitor.isNativePlatform();
 export const platform = Capacitor.getPlatform() as 'ios' | 'android' | 'web';
+// Lets CSS swap effects that are expensive in the iOS/Android WebView (live blur, endless animations).
+if (isNative && typeof document !== 'undefined') document.documentElement.classList.add('native');
+
 export const storeName = platform === 'android' ? 'Google Play' : 'the App Store';
 
 /** Open a link outside the app: Safari View Controller / Custom Tabs on native. */

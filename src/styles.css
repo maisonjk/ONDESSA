@@ -125,6 +125,13 @@ body {
   font: 400 16px/1.55 var(--sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* Keep everything below the status bar, notch and Dynamic Island (viewport-fit=cover). */
+  padding-top: env(safe-area-inset-top, 0px);
+}
+/* Opaque strip behind the status bar so scrolled content never shows under the clock and Dynamic Island. */
+body::before {
+  content: ''; position: fixed; top: 0; left: 0; right: 0; height: env(safe-area-inset-top, 0px);
+  background: var(--ivory); z-index: 30; pointer-events: none;
 }
 h1, h2, .serif, .display {
   font-family: var(--display);
@@ -266,7 +273,7 @@ textarea.input { min-height: 100px; resize: vertical; }
 .scale button[aria-pressed='true'] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 
 /* ---------- app shell ---------- */
-.app { min-height: 100dvh; padding-bottom: calc(108px + env(safe-area-inset-bottom, 0px)); }
+.app { min-height: calc(100dvh - env(safe-area-inset-top, 0px)); padding-bottom: calc(108px + env(safe-area-inset-bottom, 0px)); }
 .topbar {
   position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10;
   background: color-mix(in oklab, var(--ivory) 82%, transparent); backdrop-filter: blur(18px) saturate(1.4);
@@ -440,7 +447,7 @@ textarea.input { min-height: 100px; resize: vertical; }
 .phase-key strong { font-family: var(--display); font-weight: 400; font-size: 1.5rem; line-height: 1.05; }
 
 /* ---------- onboarding ---------- */
-.onboard { min-height: 100dvh; display: flex; flex-direction: column; }
+.onboard { min-height: calc(100dvh - env(safe-area-inset-top, 0px)); display: flex; flex-direction: column; }
 .onboard .wrap { max-width: 580px; }
 .progress { height: 4px; background: var(--line); border-radius: 4px; overflow: hidden; }
 .progress i { display: block; height: 100%; background: var(--ink); transition: width 300ms ease; }
@@ -464,7 +471,7 @@ textarea.input { min-height: 100px; resize: vertical; }
 .list-btn:last-child { border-bottom: 0; }
 .list-btn > * { min-width: 0; }
 
-.lock-screen { min-height: 100dvh; display: grid; place-items: center; padding: 24px; }
+.lock-screen { min-height: calc(100dvh - env(safe-area-inset-top, 0px)); display: grid; place-items: center; padding: 24px; }
 .pin { letter-spacing: 0.5em; text-align: center; font-family: var(--mono); font-size: 1.3rem; }
 
 .toast { position: fixed; left: 50%; bottom: calc(100px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--paper); padding: 12px 20px; border-radius: 999px; font-size: 0.88rem; z-index: 50; }
@@ -605,3 +612,11 @@ details[open] > summary::before { content: '−'; }
 .benefit-list strong { font-weight: 600; }
 .legend.legend-grid { display: grid; grid-template-columns: repeat(2, auto); justify-content: center; gap: 6px 18px; }
 @media (max-width: 639px) { .prediction-card { grid-template-columns: 1fr 112px; gap: 12px; } .prediction-card .ring { max-width: 112px; } .prediction-card .ring text { display: none; } }
+
+/* ---------- native app performance ----------
+   Live backdrop blur on the sticky header and floating tab bar is re-rendered on every
+   scroll frame in WKWebView and makes scrolling stutter. In the apps, use solid surfaces
+   on their own compositor layers instead, and stop the endless pulse on Today's dot. */
+html.native .topbar { backdrop-filter: none; -webkit-backdrop-filter: none; background: var(--ivory); transform: translateZ(0); }
+html.native .tabbar { backdrop-filter: none; -webkit-backdrop-filter: none; background: var(--paper); transform: translateZ(0); }
+html.native .ring .dot-today { animation: none; }
