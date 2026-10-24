@@ -8,6 +8,7 @@ import {
   type DayLog, type Flow, type ISODate, type Level, type Mucus, type Symptom,
 } from '../engine';
 import { PregnancyView } from './app-more';
+import { visited } from '../ui/visited';
 import {
   ConfidenceBadge, DotRing, EvidenceStrip, Icon, Mark, MedicalNote, PhasePill, Toast,
 } from '../ui/components';
@@ -131,6 +132,7 @@ export function Home() {
 
   return (
     <div className="stack" style={{ '--gap': '12px' } as React.CSSProperties}>
+      <Shortcuts completedCycles={f.cycles.length} />
       <section className={`phase-hero phase-${phase ?? 'none'} fade-in`}>
         <div className="stack" style={{ '--gap': '14px' } as React.CSSProperties}>
           <PhasePill phase={phase}>{pill}</PhasePill>
@@ -163,6 +165,8 @@ export function Home() {
       </section>
 
       <WeekStrip />
+
+      <NextStep completedCycles={f.cycles.length} hasPeriod={!!f.lastPeriod} />
 
       {heads && (
         <Link to="/app/insights" className="card plum stack phase-menstrual heads-up" >
@@ -230,6 +234,55 @@ export function Home() {
       </div>
       <MedicalNote />
     </div>
+  );
+}
+
+/** One row of the app's main tools at the top of Today, so nothing is buried in the You tab. */
+function Shortcuts({ completedCycles }: { completedCycles: number }) {
+  const { tour } = useStore();
+  const seen = tour ? ['share', 'recap'] : visited();
+  const items = [
+    { to: '/app/recap', icon: 'chart', label: 'Recap', isNew: completedCycles > 0 && !seen.includes('recap') },
+    { to: '/app/share', icon: 'people', label: 'Share', isNew: !seen.includes('share') },
+    { to: '/app/history', icon: 'history', label: 'Past periods' },
+    { to: '/app/fertility', icon: 'leaf', label: 'Fertility' },
+    { to: '/app/you', icon: 'menu', label: 'All tools' },
+  ];
+  return (
+    <nav className="shortcuts" aria-label="Tools">
+      {items.map((i) => (
+        <Link key={i.to} to={i.to} className="shortcut" aria-label={i.isNew ? `${i.label}, new` : undefined}>
+          <span className="ic"><Icon name={i.icon} />{i.isNew && <span className="new-dot" aria-hidden="true" />}</span>
+          <span>{i.label}</span>
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+/** The single most useful next thing to try, based on where the person is. Dismissed by doing it. */
+function NextStep({ completedCycles, hasPeriod }: { completedCycles: number; hasPeriod: boolean }) {
+  const { tour } = useStore();
+  if (tour || !hasPeriod) return null;
+  const seen = visited();
+  const step = completedCycles < 2
+    ? { to: '/app/history', icon: 'history', eyebrow: 'Sharper predictions', title: 'Add your last few periods', body: 'Two or three earlier start dates turn a rough estimate into a personal one.' }
+    : !seen.includes('recap')
+      ? { to: '/app/recap', icon: 'chart', eyebrow: 'Ready for you', title: 'Your cycle recap', body: 'How your last cycle went, and how close the prediction was.' }
+      : !seen.includes('share')
+        ? { to: '/app/share', icon: 'people', eyebrow: 'Optional', title: 'Give your partner a heads-up', body: 'Send only what you choose. Nothing is shared automatically.' }
+        : undefined;
+  if (!step) return null;
+  return (
+    <Link to={step.to} className="card next-step">
+      <span className="ic"><Icon name={step.icon} /></span>
+      <span className="stack" style={{ '--gap': '2px', minWidth: 0 } as React.CSSProperties}>
+        <span className="eyebrow">{step.eyebrow}</span>
+        <strong>{step.title}</strong>
+        <span className="small muted">{step.body}</span>
+      </span>
+      <Icon name="chevron" size={18} />
+    </Link>
   );
 }
 

@@ -634,3 +634,20 @@ html.native .ring .dot-today { animation: none; }
   html.native .saved-bar { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
   html.native .toast { bottom: calc(88px + env(safe-area-inset-bottom, 0px)); }
 }
+
+/* ---------- shortcuts and next step (Today) ---------- */
+.shortcuts { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+.shortcut {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 4px 0;
+  color: var(--ink); text-decoration: none; font-size: 0.72rem; font-weight: 560; text-align: center; line-height: 1.15;
+}
+.shortcut .ic {
+  position: relative; width: 52px; height: 52px; border-radius: 18px; display: grid; place-items: center;
+  background: var(--paper); border: 1px solid var(--line); color: var(--berry);
+}
+.shortcut:active .ic { transform: scale(0.96); }
+.new-dot { position: absolute; top: 7px; right: 7px; width: 8px; height: 8px; border-radius: 50%; background: var(--apricot); box-shadow: 0 0 0 2px var(--paper); }
+.next-step { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; color: var(--ink); text-decoration: none; }
+.next-step .ic { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; background: var(--paper-2); color: var(--berry); }
+@media (min-width: 760px) { .shortcuts { max-width: 520px; } }
+@media (max-width: 759px) { .ring { max-width: 240px; } }

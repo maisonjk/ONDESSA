@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link, navigate } from '../app/router';
 import { useStore } from '../app/store';
 import { exportFile, shareText } from '../platform/files';
@@ -6,31 +6,12 @@ import {
   RULES, accuracyHeadline, addDays, diffDays, formatLong, formatShort, lastCycleRecap, localToday, partnerLines, partnerMessage,
   predictedPeriodsIcs, recapText, type ISODate, type PartnerShareOptions,
 } from '../engine';
+import { useMarkVisited, visited } from '../ui/visited';
 import { EvidenceStrip, Icon, MedicalNote, PageTitle, Toast, ToggleRow, useToast } from '../ui/components';
 
 /* ------------------------------------------------------------------ You */
 
 /** Which new features this device has opened, so "New" badges disappear once seen. UI only. */
-const VISITED_KEY = 'ondessa.visited';
-function visited(): string[] {
-  try {
-    const v = JSON.parse(localStorage.getItem(VISITED_KEY) ?? '[]') as unknown;
-    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
-  } catch {
-    return [];
-  }
-}
-function useMarkVisited(id: string, skip: boolean) {
-  useEffect(() => {
-    if (skip) return;
-    try {
-      const v = visited();
-      if (!v.includes(id)) localStorage.setItem(VISITED_KEY, JSON.stringify([...v, id]));
-    } catch {
-      /* storage unavailable */
-    }
-  }, [id, skip]);
-}
 
 const PHASE_BAR = ['var(--berry)', 'var(--apricot)', 'var(--sage)', 'var(--lavender)'];
 
@@ -82,6 +63,21 @@ export function You() {
     <div className="stack" style={{ '--gap': '14px', maxWidth: 680 } as React.CSSProperties}>
       <PageTitle title="You" />
 
+      {groups.map((g) => (
+        <section key={g.title} className="stack" style={{ '--gap': '6px' } as React.CSSProperties}>
+          <h2 className="eyebrow" style={{ fontFamily: 'var(--mono)', fontSize: '0.72rem', padding: '8px 4px 0' }}>{g.title}</h2>
+          <div className="card" style={{ paddingTop: 4, paddingBottom: 4 }}>
+            {g.items.map((i) => (
+              <Link key={i.to} to={i.to} className="list-btn">
+                <span className="row" style={{ flex: '1 1 auto', minWidth: 0, alignItems: 'flex-start' }}><span style={{ color: 'var(--berry)', flex: 'none', marginTop: 2 }}><Icon name={i.icon} /></span><span style={{ minWidth: 0 }}><span style={{ fontWeight: 600, display: 'block' }}>{i.t}</span><span className="small muted">{i.d}</span></span></span>
+                <span className="row" style={{ '--gap': '8px', flex: 'none' } as React.CSSProperties}>{i.isNew && <span className="tag">NEW</span>}<Icon name="chevron" /></span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ))}
+
+      <h2 className="eyebrow" style={{ fontFamily: 'var(--mono)', fontSize: '0.72rem', padding: '8px 4px 0' }}>Account</h2>
       <Link to="/app/membership" className="card plum stack" >
         <span className="row between"><span className="eyebrow">{member.eyebrow}</span><Icon name="chevron" size={18} /></span>
         <strong style={{ fontSize: '1.1rem' }}>{member.title}</strong>
@@ -98,19 +94,6 @@ export function You() {
         </span>
       </Link>
 
-      {groups.map((g) => (
-        <section key={g.title} className="stack" style={{ '--gap': '6px' } as React.CSSProperties}>
-          <h2 className="eyebrow" style={{ fontFamily: 'var(--mono)', fontSize: '0.72rem', padding: '8px 4px 0' }}>{g.title}</h2>
-          <div className="card" style={{ paddingTop: 4, paddingBottom: 4 }}>
-            {g.items.map((i) => (
-              <Link key={i.to} to={i.to} className="list-btn">
-                <span className="row" style={{ flex: '1 1 auto', minWidth: 0, alignItems: 'flex-start' }}><span style={{ color: 'var(--berry)', flex: 'none', marginTop: 2 }}><Icon name={i.icon} /></span><span style={{ minWidth: 0 }}><span style={{ fontWeight: 600, display: 'block' }}>{i.t}</span><span className="small muted">{i.d}</span></span></span>
-                <span className="row" style={{ '--gap': '8px', flex: 'none' } as React.CSSProperties}>{i.isNew && <span className="tag">NEW</span>}<Icon name="chevron" /></span>
-              </Link>
-            ))}
-          </div>
-        </section>
-      ))}
     </div>
   );
 }
