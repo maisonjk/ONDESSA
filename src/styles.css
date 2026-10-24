@@ -620,3 +620,17 @@ details[open] > summary::before { content: '−'; }
 html.native .topbar { backdrop-filter: none; -webkit-backdrop-filter: none; background: var(--ivory); transform: translateZ(0); }
 html.native .tabbar { backdrop-filter: none; -webkit-backdrop-filter: none; background: var(--paper); transform: translateZ(0); }
 html.native .ring .dot-today { animation: none; }
+
+/* Docked tab bar in the apps: a solid bar fixed to the bottom edge, like a native iOS tab bar,
+   instead of the floating pill used on the web. The sidebar layout above 960px is unchanged. */
+@media (max-width: 959px) {
+  html.native .tabbar {
+    left: 0; right: 0; bottom: 0; max-width: none; margin: 0;
+    border: 0; border-top: 1px solid var(--line); border-radius: 0; box-shadow: none;
+    padding: 6px max(8px, env(safe-area-inset-right, 0px)) calc(4px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px));
+  }
+  html.native .tabbar a { border-radius: 14px; }
+  html.native .app { padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px)); }
+  html.native .saved-bar { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
+  html.native .toast { bottom: calc(88px + env(safe-area-inset-bottom, 0px)); }
+}
