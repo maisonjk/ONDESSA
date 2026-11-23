@@ -1,0 +1,39 @@
+name: MindRenew
+
+on:
+  push:
+    paths: ['mindrenew/**', '.github/workflows/mindrenew.yml']
+  pull_request:
+    paths: ['mindrenew/**', '.github/workflows/mindrenew.yml']
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: mindrenew
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mindrenew/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm audit --omit=dev --audit-level=high
+  scripture:
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: node scripts/verify-scripture.mjs
