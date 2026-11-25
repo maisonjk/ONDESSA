@@ -37,7 +37,7 @@ require('fs').mkdirSync(OUT, { recursive: true });
   await shoot('log', base, '/app/log', async (page) => {
     for (const n of ['headache', 'calm']) await page.getByRole('button', { name: n, exact: true }).click();
   });
-  await shoot('pregnancy', preg, '/app/pregnancy');
+  await shoot('pregnancy', preg, '/app'); // pregnancy mode Today, with shortcuts
   await shoot('privacy', base, '/app/privacy', async (page) => {
     await page.getByLabel('Passcode', { exact: true }).fill('2468');
     await page.getByRole('button', { name: 'Turn on' }).click();
